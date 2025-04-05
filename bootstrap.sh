@@ -91,7 +91,7 @@ function update_system() {
 
 # Dependency installation
 function install_required_dependencies() {
-  local common_packages=("git", "curl", "wget", "zip", "unzip", "tar")
+  local common_packages=("git" "curl" "wget" "zip" "unzip" "tar")
   local os_type=$(check_os)
 
   case "$os_type" in
