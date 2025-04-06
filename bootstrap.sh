@@ -27,7 +27,18 @@ function code() {
   tput sgr0 # Reset
 }
 
-DOTFILES_DIR="$HOME/dotfiles"
+# At the top of your script (after shebang but before functions)
+DOTFILES_DIR="${DOTFILES_DIR:-$HOME/dotfiles}" # Use existing var or fallback to $HOME
+ACTUAL_USER=$(logname 2>/dev/null || echo "$SUDO_USER" || whoami)
+ACTUAL_HOME=$(eval echo "~$ACTUAL_USER")
+
+# Override if running with sudo
+if [ "$(id -u)" -eq 0 ]; then
+  DOTFILES_DIR="$ACTUAL_HOME/dotfiles"
+  export HOME="$ACTUAL_HOME" # Ensure other home-referencing commands work
+fi
+
+info "Dotfiles will be installed to: $DOTFILES_DIR"
 
 # Package installation helper
 function install() {
@@ -146,8 +157,6 @@ function install_required_dependencies() {
 
     # Install base packages
     sudo apt -o DPkg::Lock::Timeout=60 install -y "${common_packages[@]}"
-
-    remove_snap_if_installed
     ;;
 
   *macos*)
@@ -189,9 +198,11 @@ function remove_snap_if_installed() {
   sudo apt-mark hold snapd
 
   # Install flatpak alternative
-  if ! command -v flatpak &>/dev/null; then
-    sudo apt install -y flatpak
-    sudo flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
+  if confirm "Install flatpak"; then
+    if ! command -v flatpak &>/dev/null; then
+      sudo apt install -y flatpak
+      sudo flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
+    fi
   fi
 }
 
@@ -310,7 +321,7 @@ function main() {
 
   info "==> Symlinking dotfiles..."
   cd "$DOTFILES_DIR" || {
-    warn "! Failed to enter $DOTFILES_DIR"
+    warning "! Failed to enter $DOTFILES_DIR"
     exit 1
   }
 
@@ -321,7 +332,7 @@ function main() {
       if stow -v "$dir_name"; then
         success "✓ Linked $dir_name"
       else
-        warn "! Failed to link $dir_name"
+        warning "! Failed to link $dir_name"
       fi
     else
       info "↷ Skipping $dir_name (.nostow marker present)"
