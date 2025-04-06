@@ -120,13 +120,12 @@ function update_system() {
   return 0
 }
 
-# Dependency installation
 function install_required_dependencies() {
   local common_packages=("git" "curl" "wget" "zip" "unzip" "tar" "stow")
   local os_type=$(check_os)
 
   case "$os_type" in
-  "debian-*")
+  debian-*)
     info "Installing Linux dependencies..."
 
     # Update package lists first
@@ -148,7 +147,7 @@ function install_required_dependencies() {
     remove_snap_if_installed
     ;;
 
-  "macos-arm64")
+  macos-*)
     info "Checking for macOS dependencies..."
 
     # Install Homebrew if missing
@@ -167,7 +166,7 @@ function install_required_dependencies() {
     ;;
 
   *)
-    warning "Unsupported OS. Skipping dependency installation."
+    warning "Unsupported OS: $os_type. Skipping dependency installation."
     return 1
     ;;
   esac
