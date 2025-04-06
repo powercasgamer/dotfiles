@@ -48,24 +48,53 @@ function install() {
 
 # OS detection
 function check_os() {
+  local os_type=""
+  local os_family=""
+  local os_arch=""
+
+  # Detect architecture
+  os_arch=$(uname -m) # x86_64, arm64, etc.
+
+  # Check for /etc/os-release (Linux)
   if [[ -f /etc/os-release ]]; then
     source /etc/os-release
     case "$ID" in
-    ubuntu | debian | pop | linuxmint | raspbian)
-      echo "debian-based"
+    ubuntu | debian | pop | linuxmint | raspbian | kali | neon | elementary | zorin)
+      os_family="debian"
+      ;;
+    fedora | centos | rhel | almalinux | rocky | ol)
+      os_family="rhel"
+      ;;
+    arch | manjaro | endeavouros)
+      os_family="arch"
+      ;;
+    *)
+      os_family="unknown-linux"
       ;;
     esac
+    os_type="${os_family}-${os_arch}"
+
+  # Check for macOS
+  elif [[ "$(uname -s)" == "Darwin" ]]; then
+    os_type="macos-${os_arch}"
+
+  # Check for BSD
+  elif [[ "$(uname -s)" =~ BSD ]]; then
+    os_type="bsd-${os_arch}"
+
+  # Check for Windows Subsystem for Linux (WSL)
+  elif [[ -n "$WSL_DISTRO_NAME" ]]; then
+    os_type="wsl-${os_arch}"
   fi
 
-  if [[ "$(uname -s)" == "Darwin" ]]; then
-    if [[ "$(uname -m)" == "arm64" ]]; then
-      echo "macos-arm64"
-      return 0
-    fi
+  # Validate detection
+  if [[ -z "$os_type" ]]; then
+    warning "Unsupported operating system: $(uname -s) (${os_arch})"
+    return 1
   fi
 
-  warning "Unsupported operating system!!!"
-  return 1
+  echo "$os_type"
+  return 0
 }
 
 # System update function
@@ -97,7 +126,7 @@ function install_required_dependencies() {
   local os_type=$(check_os)
 
   case "$os_type" in
-  "debian-based")
+  "debian-*")
     info "Installing Linux dependencies..."
 
     # Update package lists first
@@ -268,7 +297,7 @@ function main() {
   fi
 
   # Linux-specific operations
-  if [[ "$os_type" == "debian-based" ]]; then
+  if [[ "$os_type" == "debian-*" ]]; then
     # Confirm before destructive actions
     if confirm "Run system update and cleanup? (recommended)"; then
       update_system
