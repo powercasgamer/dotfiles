@@ -270,6 +270,7 @@ function clean_old_kernels() {
 #     └── path.zsh
 
 function main() {
+  echo "DEBUG: OS type detected as: $os_type" >&2
   info "Starting system setup..."
 
   # Detect OS first
@@ -288,7 +289,7 @@ function main() {
   fi
 
   # Linux-specific operations
-  if [[ "$os_type" == "debian-*" ]]; then
+  if [[ "$os_type" == debian-* ]]; then
     # Confirm before destructive actions
     if confirm "Run system update and cleanup? (recommended)"; then
       update_system
