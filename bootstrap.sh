@@ -1,169 +1,79 @@
 #!/bin/bash
 
-# Color and formatting functions
-function info() {
-  tput setaf 4 # Blue
-  echo "$@"    # Removed -n to print newline
-  tput sgr0    # Reset
+# === Visual functions ===
+info() {
+  tput setaf 4
+  echo "$@"
+  tput sgr0
 }
-
-function warning() {
-  tput setaf 3 # Yellow
-  tput bold    # Bold
-  echo "$@"    # Removed -n
-  tput sgr0    # Reset
+warning() {
+  tput setaf 3
+  tput bold
+  echo "$@"
+  tput sgr0
   sleep 0.5
 }
-
-function success() {
-  tput setaf 2 # Green
-  echo "$@"    # Removed -n
-  tput sgr0    # Reset
+success() {
+  tput setaf 2
+  echo "$@"
+  tput sgr0
+}
+code() {
+  tput dim
+  echo "$@"
+  tput sgr0
 }
 
-function code() {
-  tput dim  # Dim text
-  echo "$@" # Removed -n
-  tput sgr0 # Reset
-}
-
-# At the top of your script (after shebang but before functions)
-DOTFILES_DIR="${DOTFILES_DIR:-$HOME/dotfiles}" # Use existing var or fallback to $HOME
+# === Environment Setup ===
+DOTFILES_DIR="${DOTFILES_DIR:-$HOME/dotfiles}"
 ACTUAL_USER=$(logname 2>/dev/null || echo "$SUDO_USER" || whoami)
 ACTUAL_HOME=$(eval echo "~$ACTUAL_USER")
 
-# Override if running with sudo
 if [ "$(id -u)" -eq 0 ]; then
   DOTFILES_DIR="$ACTUAL_HOME/dotfiles"
-  export HOME="$ACTUAL_HOME" # Ensure other home-referencing commands work
+  export HOME="$ACTUAL_HOME"
 fi
 
 info "Dotfiles will be installed to: $DOTFILES_DIR"
 
-# Package installation helper
-function install() {
-  local package=$1
-  local install_cmd=$2
-
-  if ! command -v "$package" &>/dev/null; then
-    info "Installing $package..."
-    if ! eval "$install_cmd"; then
-      warning "Failed to install $package"
-      return 1
-    fi
-    success "$package installed successfully"
-  else
-    success "$package is already installed"
-  fi
-}
-
-# OS detection
-function check_os() {
-  local os_type=""
-  local os_family=""
-  local os_arch=""
-
-  # Detect architecture
-  os_arch=$(uname -m) # x86_64, arm64, etc.
-
-  # Check for /etc/os-release (Linux)
+# === OS Detection ===
+check_os() {
+  local os_arch=$(uname -m)
   if [[ -f /etc/os-release ]]; then
     source /etc/os-release
     case "$ID" in
-    ubuntu | debian | pop | linuxmint | raspbian | kali | neon | elementary | zorin)
-      os_family="debian"
-      ;;
-    fedora | centos | rhel | almalinux | rocky | ol)
-      os_family="rhel"
-      ;;
-    arch | manjaro | endeavouros)
-      os_family="arch"
-      ;;
-    *)
-      os_family="unknown-linux"
-      ;;
+    ubuntu | debian | pop | linuxmint | raspbian | kali | neon | elementary | zorin) echo "debian-$os_arch" ;;
+    fedora | centos | rhel | almalinux | rocky | ol) echo "rhel-$os_arch" ;;
+    arch | manjaro | endeavouros) echo "arch-$os_arch" ;;
+    *) echo "unknown-linux-$os_arch" ;;
     esac
-    os_type="${os_family}-${os_arch}"
-
-  # Check for macOS
   elif [[ "$(uname -s)" == "Darwin" ]]; then
-    os_type="macos-${os_arch}"
-
-  # Check for BSD
+    echo "macos-$os_arch"
   elif [[ "$(uname -s)" =~ BSD ]]; then
-    os_type="bsd-${os_arch}"
-
-  # Check for Windows Subsystem for Linux (WSL)
+    echo "bsd-$os_arch"
   elif [[ -n "$WSL_DISTRO_NAME" ]]; then
-    os_type="wsl-${os_arch}"
-  fi
-
-  # Validate detection
-  if [[ -z "$os_type" ]]; then
-    warning "Unsupported operating system: $(uname -s) (${os_arch})"
+    echo "wsl-$os_arch"
+  else
+    warning "Unsupported operating system: $(uname -s) ($os_arch)"
     return 1
   fi
-
-  echo "$os_type" # Only output the OS type once
-  return 0
 }
 
-# System update function
-function update_system() {
-  if [[ "$(uname -s)" != "Linux" ]]; then
-    warning "Skipping system update - Linux only function"
-    return 1
-  fi
-
-  apt_cleanup
-
-  # Carefully remove orphans while protecting drivers
-  if confirm "Remove orphaned packages (risky)?"; then
-    if command -v deborphan &>/dev/null; then
-      deborphan | grep -v -E 'amdgpu|intel-microcode|nvidia|libnvidia|glx|mesa|vulkan|wayland|xserver|firmware|systemd' |
-        xargs --no-run-if-empty sudo apt purge -y
-    else
-      warning "deborphan not installed, skipping orphaned package cleanup"
-    fi
-  fi
-
-  success "System update completed!"
-  return 0
-}
-
-function install_required_dependencies() {
-  local common_packages=("git" "curl" "wget" "zip" "unzip" "tar" "stow")
+# === Dependency Installer ===
+install_required_dependencies() {
+  local common_packages=("git" "curl" "wget" "zip" "unzip" "tar")
   local os_type=$(check_os)
-
-  # Debug output to verify what check_os returns
   echo "DEBUG: Detected OS type: '$os_type'" >&2
 
   case "$os_type" in
-  debian-* | ubuntu-* | pop-* | linuxmint-* | raspbian-*)
+  debian-* | ubuntu-* | pop-* | linuxmint-*)
     info "Installing Linux dependencies..."
-
-    # Update package lists first
     sudo apt update -qy
-
-    # Install apt HTTPS support if missing
-    if ! dpkg -s apt-transport-https &>/dev/null; then
-      info "Installing apt HTTPS support..."
-      sudo apt -o DPkg::Lock::Timeout=60 install -y --no-install-recommends \
-        apt-transport-https \
-        ca-certificates \
-        software-properties-common \
-        gnupg
-    fi
-
-    # Install base packages
-    sudo apt -o DPkg::Lock::Timeout=60 install -y "${common_packages[@]}"
+    sudo apt install -y "${common_packages[@]}"
     ;;
-
   *macos*)
     info "Checking for macOS dependencies..."
-    # [Previous macOS content here]
     ;;
-
   *)
     warning "Unsupported OS: $os_type. Skipping dependency installation."
     return 1
@@ -174,233 +84,140 @@ function install_required_dependencies() {
   return 0
 }
 
-# Snap removal function
-function remove_snap_if_installed() {
-  if ! command -v snap &>/dev/null; then
-    return 0
-  fi
-
-  info "Removing Snap..."
-
-  # Uninstall all snap packages
-  if [[ $(snap list | wc -l) -gt 1 ]]; then
-    for pkg in $(snap list | awk 'NR>1 {print $1}'); do
-      sudo snap remove --purge "$pkg"
-    done
-  fi
-
-  # Remove snapd completely
-  sudo apt purge -y snapd gnome-software-plugin-snap
-
-  # Clean up
-  sudo rm -rf /var/cache/snapd/
-  rm -rf ~/snap
-  sudo apt-mark hold snapd
-
-  # Install flatpak alternative
-  if confirm "Install flatpak"; then
-    if ! command -v flatpak &>/dev/null; then
-      sudo apt install -y flatpak
-      sudo flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
-    fi
-  fi
-}
-
-# APT maintenance
-function apt_cleanup() {
-  if ! grep -qi 'ubuntu\|debian' /etc/os-release; then
-    warning "Skipping APT cleanup - Ubuntu/Debian only"
-    return 1
-  fi
-
-  info "Starting APT maintenance..."
-
-  # Update and upgrade
-  sudo apt update -qy
-  sudo apt upgrade -qy
-  sudo apt full-upgrade -qy
-
-  # Cleanup
-  sudo apt autoremove -qy --purge
-  sudo apt autoclean
-  sudo apt clean
-
-  # Remove old kernels (keep 2 latest)
-  clean_old_kernels
-
-  # Reconfigure any pending packages
-  sudo dpkg --configure -a
-
-  success "APT maintenance completed!"
-  return 0
-}
-
-# Kernel cleanup
-function clean_old_kernels() {
-  local keep_kernels=2
-
-  info "Cleaning old kernels (keeping $keep_kernels)..."
-
-  # Remove old kernel packages
-  sudo apt purge -y $(
-    dpkg -l |
-      awk '/^ii linux-(image|headers|modules)-[0-9]+\./{print $2}' |
-      sort -V |
-      grep -v "$(uname -r | cut -d- -f1-2)" |
-      head -n -"$keep_kernels"
-  )
-
-  # Clean up /boot files
-  ls /boot | grep -E 'vmlinuz-|initrd.img-' |
-    sort -V |
-    grep -v "$(uname -r | cut -d- -f1-2)" |
-    head -n -"$keep_kernels" |
-    while read -r file; do
-      sudo rm -f "/boot/$file"
-    done
-
-  # Update GRUB if available
-  if command -v update-grub &>/dev/null; then
-    sudo update-grub
-  fi
-}
-
-# Example Directory Structure:
-# .
-# ├── zsh/
-# │   ├── install.sh
-# │   ├── aliases.zsh
-# │   └── path.zsh
-# ├── git/
-# │   ├── install.sh
-# │   └── aliases.zsh
-# └── python/
-#     ├── install.sh
-#     └── path.zsh
-
-function main() {
-  echo "DEBUG: OS type detected as: $os_type" >&2
-  info "Starting system setup..."
-
-  # Detect OS first
-  local os_type
-  os_type=$(check_os)
-  if [[ $? -ne 0 ]]; then
-    warning "Exiting due to unsupported OS"
-    return 1
-  fi
-
-  # Install core dependencies
-  install_required_dependencies
-  if [[ $? -ne 0 ]]; then
-    warning "Dependency installation failed"
-    return 1
-  fi
-
-  # Linux-specific operations
-  if [[ "$os_type" == debian-* ]]; then
-    # Confirm before destructive actions
-    if confirm "Run system update and cleanup? (recommended)"; then
-      update_system
-      clean_old_kernels
-    fi
-
-    if confirm "Remove Snap if present? (optional)"; then
-      remove_snap_if_installed
-    fi
-  fi
-
+# === Git Sync ===
+sync_dotfiles_repo() {
   if [[ ! -d "$DOTFILES_DIR" ]]; then
     info "==> Cloning dotfiles repo..."
     git clone https://github.com/powercasgamer/dotfiles.git "$DOTFILES_DIR"
   else
     info "==> Updating dotfiles repo..."
-    cd "$DOTFILES_DIR" && git fetch && git pull
+    cd "$DOTFILES_DIR" && git pull --ff-only
   fi
   success "✓ Dotfiles repo ready."
+}
 
-  info "==> Symlinking dotfiles..."
+# === Symlink Everything (excluding special files) ===
+symlink_all_dotfiles() {
   cd "$DOTFILES_DIR" || {
     warning "! Failed to enter $DOTFILES_DIR"
     exit 1
   }
 
-  # Symlink all visible directories (excluding hidden dirs and those with .nostow)
-  info "==> Symlinking top-level directories..."
-  while IFS= read -r -d '' dir; do
-    dir_name=$(basename "$dir")
-    if [[ -f "$dir/.nostow" ]]; then
-      info "↷ Skipping $dir_name (.nostow marker present)"
-      continue
-    fi
+  info "🔗 Symlinking dotfiles to $HOME..."
 
-    info "Linking $dir_name..."
-    if stow -v --no-folding --dotfiles "$dir_name"; then
-      success "✓ Successfully linked $dir_name"
-    else
-      warning "! Failed to link $dir_name (exit code: $?)"
-      # Optional: show stow error details
-      stow -v --no-folding --dotfiles "$dir_name" 2>&1 | while read -r line; do
-        warning "  $line"
-      done
-    fi
-  done < <(find . -maxdepth 1 -type d -not -name '.' -not -name '.*' -print0)
+  local excludes=(
+    ".git" ".github" ".idea" ".vscode"
+    "README*" "LICENSE*" "*.md" "*.txt"
+    "*.bak" "*.old" "*.tmp"
+    "bootstrap.sh" "backup" "examples"
+  )
 
-  load_topics
-
-  success "All operations completed!"
-  info "Recommended next steps:"
-  code "  - Log out and back in for changes to take effect"
-}
-
-function load_topics() {
-  info "Loading topic configurations...\n"
-
-  # Find all topic directories in current working directory
-  local topics=($(find . -maxdepth 1 -type d ! -name '.*' ! -name '.' | sed 's|^\./||'))
-
-  for topic in "${topics[@]}"; do
-    info "Processing topic: $topic\n"
-
-    # 1. Run install.sh if present
-    if [[ -f "$topic/install.sh" ]]; then
-      info "Running installer...\n"
-      (cd "$topic" && bash ./install.sh)
-    fi
-
-    # 2. Source all .zsh files (aliases, path, etc.)
-    for zsh_file in "$topic"/*.zsh; do
-      (source "$zsh_file") 2>/dev/null ||
-        warning "Failed to load $zsh_file"
+  for item in * .*; do
+    [[ "$item" == "." || "$item" == ".." ]] && continue
+    for pattern in "${excludes[@]}"; do
+      [[ "$item" == $pattern ]] && continue 2
     done
 
-    # 3. Special handling for completions
-    if [[ -f "$topic/completions.zsh" ]]; then
-      fpath=("$topic" $fpath)
-      autoload -Uz "$topic/completions.zsh"
+    local src="$DOTFILES_DIR/$item"
+    local dest="$HOME/$item"
+
+    if [[ -e "$dest" && ! -L "$dest" ]]; then
+      warning "‼ Conflict: $dest exists"
+      if confirm "Backup and replace?"; then
+        mv "$dest" "${dest}.bak"
+        info "Backed up to ${dest}.bak"
+      else
+        info "↷ Skipping $item"
+        continue
+      fi
     fi
+
+    ln -snf "$src" "$dest" && success "✓ Linked: $item → $dest"
   done
 }
 
-# Helper function for user confirmation
-function confirm() {
-  local message="$1 (y/N) "
-  tput setaf 3
-  echo -n "$message"
-  tput sgr0
-  read -r response
-  [[ "$response" =~ ^[Yy]([Ee][Ss])?$ ]]
-}
+# === Optional: Load per-topic logic ===
+load_topics() {
+  local zsh_base="$DOTFILES_DIR/zsh"
+  local topics_dir="$zsh_base/topics"
 
-# Only execute main if script is run directly
-if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
-  # Ensure script exits on errors
-  set -e
+  info "⚙️ Setting up ZSH..."
 
-  # Check for sudo privileges early
-  if [[ "$(id -u)" -ne 0 ]] && [[ "$(uname -s)" == "Linux" ]]; then
-    info "Some operations require sudo. You may be prompted for your password."
+  # Run top-level install.sh
+  if [[ -f "$zsh_base/install.sh" ]]; then
+    info "→ Running base zsh/install.sh"
+    (cd "$zsh_base" && bash ./install.sh)
+  else
+    warning "⚠ No install.sh found in zsh/"
   fi
 
+  if [[ ! -d "$topics_dir" ]]; then
+    warning "⚠ No topics directory found at $topics_dir"
+    return
+  fi
+
+  info "📦 Loading ZSH topics from $topics_dir..."
+
+  for topic in "$topics_dir"/*; do
+    [[ -d "$topic" ]] || continue
+    local topic_name
+    topic_name=$(basename "$topic")
+
+    # Skip if .disabled is present
+    if [[ -f "$topic/.disabled" ]]; then
+      info "↷ Skipping disabled topic: $topic_name"
+      continue
+    fi
+
+    info "→ Installing topic: $topic_name"
+
+    # Run install.sh if present
+    if [[ -f "$topic/install.sh" ]]; then
+      (cd "$topic" && bash ./install.sh)
+    else
+      info "   No install.sh found for $topic_name, continuing..."
+    fi
+
+    # Copy .zsh files into a common autoloadable directory (optional)
+    # For now, just info — you'll source them in your .zshrc
+    for zsh_file in "$topic"/*.zsh; do
+      if [[ -f "$zsh_file" ]]; then
+        info "   Found ZSH config: $(basename "$zsh_file")"
+        # You can collect paths or source them here if you want to
+      fi
+    done
+  done
+}
+
+# === Prompt Helper ===
+confirm() {
+  tput setaf 3
+  echo -n "$1 (y/N): "
+  tput sgr0
+  read -r ans
+  [[ "$ans" =~ ^[Yy]([Ee][Ss])?$ ]]
+}
+
+# === Main ===
+main() {
+  info "Starting dotfiles setup..."
+  check_os || {
+    warning "Unsupported OS"
+    return 1
+  }
+
+  install_required_dependencies || return 1
+  sync_dotfiles_repo
+  symlink_all_dotfiles
+  load_topics
+
+  success "All operations completed!"
+  info "Recommended: log out and back in for changes to take effect."
+}
+
+# Run if script is executed directly
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+  set -e
+  [[ "$(id -u)" -ne 0 ]] && info "Some steps may require sudo access"
   main "$@"
 fi
