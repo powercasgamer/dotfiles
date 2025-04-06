@@ -64,7 +64,7 @@ function check_os() {
     fi
   fi
 
-  warning "Unsupported operating system"
+  warning "Unsupported operating system!!!"
   return 1
 }
 
