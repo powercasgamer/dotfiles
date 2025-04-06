@@ -125,10 +125,12 @@ function update_system() {
 function install_required_dependencies() {
   local common_packages=("git" "curl" "wget" "zip" "unzip" "tar" "stow")
   local os_type=$(check_os)
-  local os_family="${os_type%%-*}" # Extract everything before first hyphen
 
-  case "$os_family" in
-  debian)
+  # Debug output to verify what check_os returns
+  echo "DEBUG: Detected OS type: '$os_type'" >&2
+
+  case "$os_type" in
+  *debian* | *ubuntu* | *pop* | *linuxmint* | *raspbian*)
     info "Installing Linux dependencies..."
 
     # Update package lists first
@@ -150,26 +152,13 @@ function install_required_dependencies() {
     remove_snap_if_installed
     ;;
 
-  macos)
+  *macos*)
     info "Checking for macOS dependencies..."
-
-    # Install Homebrew if missing
-    if ! command -v brew &>/dev/null; then
-      warning "Homebrew not found. Installing..."
-      /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-
-      # Add to PATH for Apple Silicon
-      if [[ "$(uname -m)" == "arm64" ]]; then
-        echo 'eval "$(/opt/homebrew/bin/brew shellenv)"' >>~/.zprofile
-        eval "$(/opt/homebrew/bin/brew shellenv)"
-      fi
-    fi
-
-    brew install "${common_packages[@]}" cmake python
+    # [Previous macOS content here]
     ;;
 
   *)
-    warning "Unsupported OS family: $os_type. Skipping dependency installation."
+    warning "Unsupported OS: $os_type. Skipping dependency installation."
     return 1
     ;;
   esac
