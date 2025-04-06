@@ -87,15 +87,13 @@ function check_os() {
     os_type="wsl-${os_arch}"
   fi
 
-  info "${os_type}"
-
   # Validate detection
   if [[ -z "$os_type" ]]; then
     warning "Unsupported operating system: $(uname -s) (${os_arch})"
     return 1
   fi
 
-  echo "$os_type"
+  echo "$os_type" # Only output the OS type once
   return 0
 }
 
@@ -130,7 +128,7 @@ function install_required_dependencies() {
   echo "DEBUG: Detected OS type: '$os_type'" >&2
 
   case "$os_type" in
-  *debian* | *ubuntu* | *pop* | *linuxmint* | *raspbian*)
+  debian-* | ubuntu-* | pop-* | linuxmint-* | raspbian-*)
     info "Installing Linux dependencies..."
 
     # Update package lists first
