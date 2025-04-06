@@ -326,18 +326,25 @@ function main() {
   }
 
   # Symlink all visible directories (excluding hidden dirs and those with .nostow)
-  find . -maxdepth 1 -type d -not -name '.' -not -name '.*' -print0 | while IFS= read -r -d '' dir; do
+  info "==> Symlinking top-level directories..."
+  while IFS= read -r -d '' dir; do
     dir_name=$(basename "$dir")
-    if [[ ! -f "$dir/.nostow" ]]; then
-      if stow -v "$dir_name"; then
-        success "✓ Linked $dir_name"
-      else
-        warning "! Failed to link $dir_name"
-      fi
-    else
+    if [[ -f "$dir/.nostow" ]]; then
       info "↷ Skipping $dir_name (.nostow marker present)"
+      continue
     fi
-  done
+
+    info "Linking $dir_name..."
+    if stow -v --no-folding --dotfiles "$dir_name"; then
+      success "✓ Successfully linked $dir_name"
+    else
+      warning "! Failed to link $dir_name (exit code: $?)"
+      # Optional: show stow error details
+      stow -v --no-folding --dotfiles "$dir_name" 2>&1 | while read -r line; do
+        warning "  $line"
+      done
+    fi
+  done < <(find . -maxdepth 1 -type d -not -name '.' -not -name '.*' -print0)
 
   load_topics
 
