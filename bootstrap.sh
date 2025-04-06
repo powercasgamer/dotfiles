@@ -61,7 +61,7 @@ check_os() {
 
 # === Dependency Installer ===
 install_required_dependencies() {
-  local common_packages=("git" "curl" "wget" "zip" "unzip" "tar")
+  local common_packages=("git" "curl" "wget" "zip" "unzip" "tar" "zsh")
   local os_type=$(check_os)
   echo "DEBUG: Detected OS type: '$os_type'" >&2
 
@@ -136,57 +136,42 @@ symlink_all_dotfiles() {
   done
 }
 
-# === Optional: Load per-topic logic ===
-load_topics() {
-  local zsh_base="$DOTFILES_DIR/zsh"
-  local topics_dir="$zsh_base/topics"
+set_zsh_as_default() {
+  # Verify Zsh is installed
+  if ! command -v zsh >/dev/null; then
+    echo "Error: zsh is not installed." >&2
+    [[ "$OSTYPE" == "linux-gnu"* ]] && echo "Install with: sudo apt install zsh" >&2
+    [[ "$OSTYPE" == "darwin"* ]] && echo "Install with: brew install zsh" >&2
+    return 1
+  fi
 
-  info "⚙️ Setting up ZSH..."
+  # Get Zsh path (different locations on different systems)
+  local zsh_path
+  zsh_path=$(command -v zsh)
 
-  # Run top-level install.sh
-  if [[ -f "$zsh_base/install.sh" ]]; then
-    info "→ Running base zsh/install.sh"
-    (cd "$zsh_base" && bash ./install.sh)
+  # Linux (Ubuntu/Debian)
+  if [[ "$OSTYPE" == "linux-gnu"* ]]; then
+    if ! grep -q "$zsh_path" /etc/shells; then
+      echo "Adding zsh to /etc/shells..."
+      echo "$zsh_path" | sudo tee -a /etc/shells >/dev/null
+    fi
+    chsh -s "$zsh_path"
+
+  # macOS
+  elif [[ "$OSTYPE" == "darwin"* ]]; then
+    if ! grep -q "$zsh_path" /etc/shells; then
+      echo "Adding zsh to /etc/shells..."
+      sudo sh -c "echo '$zsh_path' >> /etc/shells"
+    fi
+    chsh -s "$zsh_path"
+
   else
-    warning "⚠ No install.sh found in zsh/"
+    echo "Unsupported OS: $OSTYPE" >&2
+    return 1
   fi
 
-  if [[ ! -d "$topics_dir" ]]; then
-    warning "⚠ No topics directory found at $topics_dir"
-    return
-  fi
-
-  info "📦 Loading ZSH topics from $topics_dir..."
-
-  for topic in "$topics_dir"/*; do
-    [[ -d "$topic" ]] || continue
-    local topic_name
-    topic_name=$(basename "$topic")
-
-    # Skip if .disabled is present
-    if [[ -f "$topic/.disabled" ]]; then
-      info "↷ Skipping disabled topic: $topic_name"
-      continue
-    fi
-
-    info "→ Installing topic: $topic_name"
-
-    # Run install.sh if present
-    if [[ -f "$topic/install.sh" ]]; then
-      (cd "$topic" && bash ./install.sh)
-    else
-      info "   No install.sh found for $topic_name, continuing..."
-    fi
-
-    # Copy .zsh files into a common autoloadable directory (optional)
-    # For now, just info — you'll source them in your .zshrc
-    for zsh_file in "$topic"/*.zsh; do
-      if [[ -f "$zsh_file" ]]; then
-        info "   Found ZSH config: $(basename "$zsh_file")"
-        # You can collect paths or source them here if you want to
-      fi
-    done
-  done
+  echo "Success! Default shell set to: $zsh_path"
+  echo "Note: This change will take effect in new terminal sessions."
 }
 
 # === Prompt Helper ===
@@ -210,6 +195,8 @@ main() {
   sync_dotfiles_repo
   symlink_all_dotfiles
   load_topics
+
+  set_zsh_as_default
 
   success "All operations completed!"
   info "Recommended: log out and back in for changes to take effect."
