@@ -14,10 +14,20 @@ if ! command -v zsh &>/dev/null; then
     fi
 fi
 
-# Set zsh as default shell if it's not already
-if [[ "$SHELL" != "$(command -v zsh)" ]]; then
+ZSH_PATH="$(command -v zsh)"
+
+# Add Zsh to /etc/shells if it's not listed
+if [[ "$OSTYPE" == "linux-gnu"* || "$OSTYPE" == "darwin"* ]]; then
+    if ! grep -qx "$ZSH_PATH" /etc/shells; then
+        echo "📄 Adding $ZSH_PATH to /etc/shells..."
+        echo "$ZSH_PATH" | sudo tee -a /etc/shells >/dev/null
+    fi
+fi
+
+# Set Zsh as default shell if it's not already
+if [[ "$SHELL" != "$ZSH_PATH" ]]; then
     echo "⚙️ Changing default shell to Zsh..."
-    chsh -s "$(command -v zsh)"
+    chsh -s "$ZSH_PATH"
 else
     echo "✅ Zsh is already the default shell."
 fi
