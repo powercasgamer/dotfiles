@@ -31,16 +31,16 @@ function code() {
 function install() {
   local package=$1
   local install_cmd=$2
-  
+
   if ! command -v "$package" &>/dev/null; then
-    info "Installing $package...\n"
+    info "Installing $package..."
     if ! eval "$install_cmd"; then
-      warning "Failed to install $package\n"
+      warning "Failed to install $package"
       return 1
     fi
-    success "$package installed successfully\n"
+    success "$package installed successfully"
   else
-    success "$package is already installed\n"
+    success "$package is already installed"
   fi
 }
 
@@ -49,10 +49,10 @@ function check_os() {
   if [[ -f /etc/os-release ]]; then
     source /etc/os-release
     case "$ID" in
-      ubuntu|debian)
-        echo "ubuntu/debian"
-        return 0
-        ;;
+    ubuntu | debian)
+      echo "ubuntu/debian"
+      return 0
+      ;;
     esac
   fi
 
@@ -63,29 +63,29 @@ function check_os() {
     fi
   fi
 
-  warning "Unsupported operating system\n"
+  warning "Unsupported operating system"
   return 1
 }
 
 # System update function
 function update_system() {
   if [[ "$(uname -s)" != "Linux" ]]; then
-    warning "Skipping system update - Linux only function\n"
+    warning "Skipping system update - Linux only function"
     return 1
   fi
 
   apt_cleanup
 
   # Carefully remove orphans while protecting drivers
-  info "Cleaning orphaned packages (carefully)...\n"
+  info "Cleaning orphaned packages (carefully)..."
   if command -v deborphan &>/dev/null; then
     deborphan | grep -v -E 'amdgpu|intel-microcode|nvidia|libnvidia|glx|mesa|vulkan|wayland|xserver|firmware|systemd' |
       xargs --no-run-if-empty sudo apt purge -y
   else
-    warning "deborphan not installed, skipping orphaned package cleanup\n"
+    warning "deborphan not installed, skipping orphaned package cleanup"
   fi
 
-  success "System update completed!\n"
+  success "System update completed!"
   return 0
 }
 
@@ -95,53 +95,53 @@ function install_required_dependencies() {
   local os_type=$(check_os)
 
   case "$os_type" in
-    "ubuntu/debian")
-      info "Installing Linux dependencies...\n"
-      
-      # Update package lists first
-      sudo apt update -qy
-      
-      # Install base packages
-      sudo apt install -y "${common_packages[@]}"
+  "ubuntu/debian")
+    info "Installing Linux dependencies..."
 
-      # Install apt HTTPS support if missing
-      if ! dpkg -s apt-transport-https &>/dev/null; then
-        info "Installing apt HTTPS support...\n"
-        sudo apt install -y --no-install-recommends \
-          apt-transport-https \
-          ca-certificates \
-          software-properties-common \
-          gnupg
+    # Update package lists first
+    sudo apt update -qy
+
+    # Install base packages
+    sudo apt install -y "${common_packages[@]}"
+
+    # Install apt HTTPS support if missing
+    if ! dpkg -s apt-transport-https &>/dev/null; then
+      info "Installing apt HTTPS support..."
+      sudo apt install -y --no-install-recommends \
+        apt-transport-https \
+        ca-certificates \
+        software-properties-common \
+        gnupg
+    fi
+
+    remove_snap_if_installed
+    ;;
+
+  "macos-arm64")
+    info "Checking for macOS dependencies..."
+
+    # Install Homebrew if missing
+    if ! command -v brew &>/dev/null; then
+      warning "Homebrew not found. Installing..."
+      /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+
+      # Add to PATH for Apple Silicon
+      if [[ "$(uname -m)" == "arm64" ]]; then
+        echo 'eval "$(/opt/homebrew/bin/brew shellenv)"' >>~/.zprofile
+        eval "$(/opt/homebrew/bin/brew shellenv)"
       fi
+    fi
 
-      remove_snap_if_installed
-      ;;
+    brew install "${common_packages[@]}" cmake python
+    ;;
 
-    "macos-arm64")
-      info "Checking for macOS dependencies...\n"
-      
-      # Install Homebrew if missing
-      if ! command -v brew &>/dev/null; then
-        warning "Homebrew not found. Installing...\n"
-        /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-        
-        # Add to PATH for Apple Silicon
-        if [[ "$(uname -m)" == "arm64" ]]; then
-          echo 'eval "$(/opt/homebrew/bin/brew shellenv)"' >> ~/.zprofile
-          eval "$(/opt/homebrew/bin/brew shellenv)"
-        fi
-      fi
-
-      brew install "${common_packages[@]}" cmake python
-      ;;
-      
-    *)
-      warning "Unsupported OS. Skipping dependency installation.\n"
-      return 1
-      ;;
+  *)
+    warning "Unsupported OS. Skipping dependency installation."
+    return 1
+    ;;
   esac
 
-  success "Dependencies installed successfully!\n"
+  success "Dependencies installed successfully!"
   return 0
 }
 
@@ -151,8 +151,8 @@ function remove_snap_if_installed() {
     return 0
   fi
 
-  info "Removing Snap...\n"
-  
+  info "Removing Snap..."
+
   # Uninstall all snap packages
   if [[ $(snap list | wc -l) -gt 1 ]]; then
     for pkg in $(snap list | awk 'NR>1 {print $1}'); do
@@ -162,12 +162,12 @@ function remove_snap_if_installed() {
 
   # Remove snapd completely
   sudo apt purge -y snapd gnome-software-plugin-snap
-  
+
   # Clean up
   sudo rm -rf /var/cache/snapd/
   rm -rf ~/snap
   sudo apt-mark hold snapd
-  
+
   # Install flatpak alternative
   if ! command -v flatpak &>/dev/null; then
     sudo apt install -y flatpak
@@ -178,12 +178,12 @@ function remove_snap_if_installed() {
 # APT maintenance
 function apt_cleanup() {
   if ! grep -qi 'ubuntu\|debian' /etc/os-release; then
-    warning "Skipping APT cleanup - Ubuntu/Debian only\n"
+    warning "Skipping APT cleanup - Ubuntu/Debian only"
     return 1
   fi
 
-  info "Starting APT maintenance...\n"
-  
+  info "Starting APT maintenance..."
+
   # Update and upgrade
   sudo apt update -qy
   sudo apt upgrade -qy
@@ -200,7 +200,7 @@ function apt_cleanup() {
   # Reconfigure any pending packages
   sudo dpkg --configure -a
 
-  success "APT maintenance completed!\n"
+  success "APT maintenance completed!"
   return 0
 }
 
@@ -208,22 +208,22 @@ function apt_cleanup() {
 function clean_old_kernels() {
   local keep_kernels=2
 
-  info "Cleaning old kernels (keeping $keep_kernels)...\n"
-  
+  info "Cleaning old kernels (keeping $keep_kernels)..."
+
   # Remove old kernel packages
   sudo apt purge -y $(
-    dpkg -l | 
-    awk '/^ii linux-(image|headers|modules)-[0-9]+\./{print $2}' | 
-    sort -V | 
-    grep -v "$(uname -r | cut -d- -f1-2)" | 
-    head -n -"$keep_kernels"
+    dpkg -l |
+      awk '/^ii linux-(image|headers|modules)-[0-9]+\./{print $2}' |
+      sort -V |
+      grep -v "$(uname -r | cut -d- -f1-2)" |
+      head -n -"$keep_kernels"
   )
 
   # Clean up /boot files
-  ls /boot | grep -E 'vmlinuz-|initrd.img-' | 
-    sort -V | 
-    grep -v "$(uname -r | cut -d- -f1-2)" | 
-    head -n -"$keep_kernels" | 
+  ls /boot | grep -E 'vmlinuz-|initrd.img-' |
+    sort -V |
+    grep -v "$(uname -r | cut -d- -f1-2)" |
+    head -n -"$keep_kernels" |
     while read -r file; do
       sudo rm -f "/boot/$file"
     done
@@ -234,61 +234,106 @@ function clean_old_kernels() {
   fi
 }
 
+# Example Directory Structure:
+# .
+# ├── zsh/
+# │   ├── install.sh
+# │   ├── aliases.zsh
+# │   └── path.zsh
+# ├── git/
+# │   ├── install.sh
+# │   └── aliases.zsh
+# └── python/
+#     ├── install.sh
+#     └── path.zsh
+
 function main() {
-    info "Starting system setup...\n"
+  info "Starting system setup..."
+
+  # Detect OS first
+  local os_type
+  os_type=$(check_os)
+  if [[ $? -ne 0 ]]; then
+    warning "Exiting due to unsupported OS"
+    return 1
+  fi
+
+  # Install core dependencies
+  install_required_dependencies
+  if [[ $? -ne 0 ]]; then
+    warning "Dependency installation failed"
+    return 1
+  fi
+
+  # Linux-specific operations
+  if [[ "$os_type" == "ubuntu/debian" ]]; then
+    # Confirm before destructive actions
+    if confirm "Run system update and cleanup? (recommended)"; then
+      update_system
+      clean_old_kernels
+    fi
+
+    if confirm "Remove Snap if present? (optional)"; then
+      remove_snap_if_installed
+    fi
+  fi
+
+  load_topics
+
+  success "All operations completed!"
+  info "Recommended next steps:"
+  code "  - Log out and back in for changes to take effect"
+}
+
+function load_topics() {
+  info "Loading topic configurations...\n"
+  
+  # Find all topic directories in current working directory
+  local topics=( $(find . -maxdepth 1 -type d ! -name '.*' ! -name '.' | sed 's|^\./||') )
+  
+  for topic in "${topics[@]}"; do
+    info "Processing topic: $topic\n"
     
-    # Detect OS first
-    local os_type
-    os_type=$(check_os)
-    if [[ $? -ne 0 ]]; then
-        warning "Exiting due to unsupported OS\n"
-        return 1
+    # 1. Run install.sh if present
+    if [[ -f "$topic/install.sh" ]]; then
+      info "Running installer...\n"
+      (cd "$topic" && bash ./install.sh)
     fi
 
-    # Install core dependencies
-    install_required_dependencies
-    if [[ $? -ne 0 ]]; then
-        warning "Dependency installation failed\n"
-        return 1
+    # 2. Source all .zsh files (aliases, path, etc.)
+    for zsh_file in "$topic"/*.zsh; do
+      [[ -f "$zsh_file" ]] || continue
+      info "Loading $zsh_file\n"
+      source "$zsh_file"
+    done
+
+    # 3. Special handling for completions
+    if [[ -f "$topic/completions.zsh" ]]; then
+      fpath=("$topic" $fpath)
+      autoload -Uz "$topic/completions.zsh"
     fi
-
-    # Linux-specific operations
-    if [[ "$os_type" == "ubuntu/debian" ]]; then
-        # Confirm before destructive actions
-        if confirm "Run system update and cleanup? (recommended)"; then
-            update_system
-            clean_old_kernels
-        fi
-
-        if confirm "Remove Snap if present? (optional)"; then
-            remove_snap_if_installed
-        fi
-    fi
-
-    success "\nAll operations completed!\n"
-    info "Recommended next steps:\n"
-    code "  - Log out and back in for changes to take effect\n"
+  done
 }
 
 # Helper function for user confirmation
 function confirm() {
-    local message="$1 (y/N) "
-    tput setaf 3
-    echo -n "$message"
-    tput sgr0
-    read -r response
-    [[ "$response" =~ ^[Yy]$ ]]
+  local message="$1 (y/N) "
+  tput setaf 3
+  echo -n "$message"
+  tput sgr0
+  read -r response
+  [[ "$response" =~ ^[Yy]$ ]]
 }
 
 # Only execute main if script is run directly
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
-    # Ensure script exits on errors
-    set -e
-    
-    # Check for sudo privileges early
-    if [[ "$(id -u)" -ne 0 ]] && [[ "$(uname -s)" == "Linux" ]]; then
-        info "Some operations require sudo. You may be prompted for your password.\n"
-    fi
+  # Ensure script exits on errors
+  set -e
 
-    main "$@"
+  # Check for sudo privileges early
+  if [[ "$(id -u)" -ne 0 ]] && [[ "$(uname -s)" == "Linux" ]]; then
+    info "Some operations require sudo. You may be prompted for your password."
+  fi
+
+  main "$@"
 fi
