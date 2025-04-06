@@ -92,15 +92,29 @@ load_zsh_topics() {
       [[ "$zsh_file" == */completions.zsh ]] && continue
       source "$zsh_file"
     done
+
+    # 3. Thirdly: Run install.sh if exists
+    [[ -f "$topic_dir/install.sh" ]] && {
+      echo "⚙️ Installing ${topic_dir##*/}"
+      (cd "$topic_dir" && bash install.sh)
+    }
   done
 
-  # Initialize completions once
+  # Initialize completions once after all topics are loaded
   autoload -Uz compinit
   compinit -i -d "${ZSH_COMPDUMP:-${ZDOTDIR:-$HOME}/.zcompdump}"
 }
 
 # Run on new shells
 [[ -z "$ZSH_FAST_LOAD" ]] && load_zsh_topics
+
+# Stash your environment variables in ~/.localrc. This means they'll stay out
+# of your main dotfiles repository (which may be public, like this one), but
+# you'll have access to them in your scripts.
+if [[ -a ~/.localrc ]]
+then
+  source ~/.localrc
+fi
 
 # Aliases etc
 # Source all .zsh files in directory
