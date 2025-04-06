@@ -87,6 +87,8 @@ function check_os() {
     os_type="wsl-${os_arch}"
   fi
 
+  info "${os_type}"
+
   # Validate detection
   if [[ -z "$os_type" ]]; then
     warning "Unsupported operating system: $(uname -s) (${os_arch})"
