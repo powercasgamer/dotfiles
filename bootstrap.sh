@@ -2,29 +2,29 @@
 
 # Color and formatting functions
 function info() {
-  tput setaf 4
-  echo -n "$@"
-  tput sgr0
+  tput setaf 4  # Blue
+  echo "$@"     # Removed -n to print newline
+  tput sgr0     # Reset
 }
 
 function warning() {
-  tput setaf 3
-  tput bold
-  echo -n "$@"
-  tput sgr0
+  tput setaf 3  # Yellow
+  tput bold     # Bold
+  echo "$@"     # Removed -n
+  tput sgr0     # Reset
   sleep 0.5
 }
 
 function success() {
-  tput setaf 2
-  echo -n "$@"
-  tput sgr0
+  tput setaf 2  # Green
+  echo "$@"     # Removed -n
+  tput sgr0     # Reset
 }
 
 function code() {
-  tput dim
-  echo -n "$@"
-  tput sgr0
+  tput dim      # Dim text
+  echo "$@"     # Removed -n
+  tput sgr0     # Reset
 }
 
 # Package installation helper
