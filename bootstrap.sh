@@ -2,30 +2,32 @@
 
 # Color and formatting functions
 function info() {
-  tput setaf 4  # Blue
-  echo "$@"     # Removed -n to print newline
-  tput sgr0     # Reset
+  tput setaf 4 # Blue
+  echo "$@"    # Removed -n to print newline
+  tput sgr0    # Reset
 }
 
 function warning() {
-  tput setaf 3  # Yellow
-  tput bold     # Bold
-  echo "$@"     # Removed -n
-  tput sgr0     # Reset
+  tput setaf 3 # Yellow
+  tput bold    # Bold
+  echo "$@"    # Removed -n
+  tput sgr0    # Reset
   sleep 0.5
 }
 
 function success() {
-  tput setaf 2  # Green
-  echo "$@"     # Removed -n
-  tput sgr0     # Reset
+  tput setaf 2 # Green
+  echo "$@"    # Removed -n
+  tput sgr0    # Reset
 }
 
 function code() {
-  tput dim      # Dim text
-  echo "$@"     # Removed -n
-  tput sgr0     # Reset
+  tput dim  # Dim text
+  echo "$@" # Removed -n
+  tput sgr0 # Reset
 }
+
+DOTFILES_DIR="$HOME/dotfiles"
 
 # Package installation helper
 function install() {
@@ -49,9 +51,8 @@ function check_os() {
   if [[ -f /etc/os-release ]]; then
     source /etc/os-release
     case "$ID" in
-    ubuntu | debian)
-      echo "ubuntu/debian"
-      return 0
+    ubuntu | debian | pop | linuxmint | raspbian)
+      echo "debian-based"
       ;;
     esac
   fi
@@ -77,12 +78,13 @@ function update_system() {
   apt_cleanup
 
   # Carefully remove orphans while protecting drivers
-  info "Cleaning orphaned packages (carefully)..."
-  if command -v deborphan &>/dev/null; then
-    deborphan | grep -v -E 'amdgpu|intel-microcode|nvidia|libnvidia|glx|mesa|vulkan|wayland|xserver|firmware|systemd' |
-      xargs --no-run-if-empty sudo apt purge -y
-  else
-    warning "deborphan not installed, skipping orphaned package cleanup"
+  if confirm "Remove orphaned packages (risky)?"; then
+    if command -v deborphan &>/dev/null; then
+      deborphan | grep -v -E 'amdgpu|intel-microcode|nvidia|libnvidia|glx|mesa|vulkan|wayland|xserver|firmware|systemd' |
+        xargs --no-run-if-empty sudo apt purge -y
+    else
+      warning "deborphan not installed, skipping orphaned package cleanup"
+    fi
   fi
 
   success "System update completed!"
@@ -91,28 +93,28 @@ function update_system() {
 
 # Dependency installation
 function install_required_dependencies() {
-  local common_packages=("git" "curl" "wget" "zip" "unzip" "tar")
+  local common_packages=("git" "curl" "wget" "zip" "unzip" "tar" "stow")
   local os_type=$(check_os)
 
   case "$os_type" in
-  "ubuntu/debian")
+  "debian-based")
     info "Installing Linux dependencies..."
 
     # Update package lists first
     sudo apt update -qy
 
-    # Install base packages
-    sudo apt install -y "${common_packages[@]}"
-
     # Install apt HTTPS support if missing
     if ! dpkg -s apt-transport-https &>/dev/null; then
       info "Installing apt HTTPS support..."
-      sudo apt install -y --no-install-recommends \
+      sudo apt -o DPkg::Lock::Timeout=60 install -y --no-install-recommends \
         apt-transport-https \
         ca-certificates \
         software-properties-common \
         gnupg
     fi
+
+    # Install base packages
+    sudo apt -o DPkg::Lock::Timeout=60 install -y "${common_packages[@]}"
 
     remove_snap_if_installed
     ;;
@@ -266,7 +268,7 @@ function main() {
   fi
 
   # Linux-specific operations
-  if [[ "$os_type" == "ubuntu/debian" ]]; then
+  if [[ "$os_type" == "debian-based" ]]; then
     # Confirm before destructive actions
     if confirm "Run system update and cleanup? (recommended)"; then
       update_system
@@ -278,6 +280,35 @@ function main() {
     fi
   fi
 
+  if [[ ! -d "$DOTFILES_DIR" ]]; then
+    info "==> Cloning dotfiles repo..."
+    git clone https://github.com/powercasgamer/dotfiles.git "$DOTFILES_DIR"
+  else
+    info "==> Updating dotfiles repo..."
+    cd "$DOTFILES_DIR" && git fetch && git pull
+  fi
+  success "✓ Dotfiles repo ready."
+
+  info "==> Symlinking dotfiles..."
+  cd "$DOTFILES_DIR" || {
+    warn "! Failed to enter $DOTFILES_DIR"
+    exit 1
+  }
+
+  # Symlink all visible directories (excluding hidden dirs and those with .nostow)
+  find . -maxdepth 1 -type d -not -name '.' -not -name '.*' -print0 | while IFS= read -r -d '' dir; do
+    dir_name=$(basename "$dir")
+    if [[ ! -f "$dir/.nostow" ]]; then
+      if stow -v "$dir_name"; then
+        success "✓ Linked $dir_name"
+      else
+        warn "! Failed to link $dir_name"
+      fi
+    else
+      info "↷ Skipping $dir_name (.nostow marker present)"
+    fi
+  done
+
   load_topics
 
   success "All operations completed!"
@@ -287,13 +318,13 @@ function main() {
 
 function load_topics() {
   info "Loading topic configurations...\n"
-  
+
   # Find all topic directories in current working directory
-  local topics=( $(find . -maxdepth 1 -type d ! -name '.*' ! -name '.' | sed 's|^\./||') )
-  
+  local topics=($(find . -maxdepth 1 -type d ! -name '.*' ! -name '.' | sed 's|^\./||'))
+
   for topic in "${topics[@]}"; do
     info "Processing topic: $topic\n"
-    
+
     # 1. Run install.sh if present
     if [[ -f "$topic/install.sh" ]]; then
       info "Running installer...\n"
@@ -302,9 +333,8 @@ function load_topics() {
 
     # 2. Source all .zsh files (aliases, path, etc.)
     for zsh_file in "$topic"/*.zsh; do
-      [[ -f "$zsh_file" ]] || continue
-      info "Loading $zsh_file\n"
-      source "$zsh_file"
+      (source "$zsh_file") 2>/dev/null ||
+        warning "Failed to load $zsh_file"
     done
 
     # 3. Special handling for completions
@@ -322,7 +352,7 @@ function confirm() {
   echo -n "$message"
   tput sgr0
   read -r response
-  [[ "$response" =~ ^[Yy]$ ]]
+  [[ "$response" =~ ^[Yy]([Ee][Ss])?$ ]]
 }
 
 # Only execute main if script is run directly
