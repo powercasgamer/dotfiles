@@ -1,0 +1,61 @@
+# ===== System-Wide Zsh Configuration =====
+# Applies to all users (can be overridden in ~/.zshrc)
+
+# ---- Basic Settings ----
+# Set sane defaults for all users
+setopt INC_APPEND_HISTORY       # Write to history immediately
+setopt HIST_IGNORE_ALL_DUPS     # Ignore duplicate commands
+setopt HIST_IGNORE_SPACE        # Don't record commands starting with space
+setopt SHARE_HISTORY            # Share history across sessions
+HISTSIZE=10000                  # Big history
+SAVEHIST=10000
+HISTFILE=~/.zsh_history         # Still user-specific file
+
+# ---- Completion System ----
+autoload -Uz compinit && compinit # Basic completion
+zstyle ':completion:*' menu select # Menu-driven completion
+zstyle ':completion:*' list-colors "${(s.:.)LS_COLORS}" # Colorful completion
+
+# ---- Environment Variables ----
+export EDITOR=nano              # Default editor (safe choice)
+export PAGER=less               # Default pager
+export LESS='-R'                # Color support in less
+
+# ---- Safety Defaults ----
+umask 022                       # Sensible default permissions
+setopt NO_BEEP                  # Disable annoying beeps
+setopt INTERACTIVE_COMMENTS     # Allow comments in interactive shell
+
+# ---- System-Specific Paths ----
+# Add system-wide binaries to PATH (if they exist)
+[ -d "/usr/local/bin" ] && export PATH="/usr/local/bin:$PATH"
+
+# ---- Color Support ----
+# Enable colors for all users if terminal supports it
+if [ -x /usr/bin/dircolors ]; then
+    test -r ~/.dircolors && eval "$(dircolors -b ~/.dircolors)" || eval "$(dircolors -b)"
+    alias ls='ls --color=auto'
+    alias grep='grep --color=auto'
+    alias fgrep='fgrep --color=auto'
+    alias egrep='egrep --color=auto'
+fi
+
+# ---- Safe Aliases ----
+alias ll='ls -alFh'             # Detailed listing
+alias la='ls -A'                # Show hidden files
+alias l='ls -CF'                # Columnized listing
+alias df='df -h'                # Human-readable disk usage
+alias du='du -h'                # Human-readable file sizes
+
+# ---- Security ----
+# Disable Ctrl+S freezing terminal (safe for all users)
+stty -ixon
+
+# ---- Zsh Helpers ----
+# Enable help command for builtins
+autoload -Uz run-help
+(( ${+aliases[run-help]} )) && unalias run-help
+alias help=run-help
+
+# ===== End of System-Wide Config =====
+# Users can override these in their ~/.zshrc

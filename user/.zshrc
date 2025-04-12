@@ -125,5 +125,7 @@ if [[ -d ~/zsh/includes ]]; then
 fi
 export LS_COLORS="$LS_COLORS:ow=1;34;42"
 
+export PATH="$HOME/bin:$PATH"
+
 
 [[ -f ~/.zshrc.local ]] && source ~/.zshrc.local
