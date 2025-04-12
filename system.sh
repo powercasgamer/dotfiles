@@ -288,7 +288,7 @@ install_topics() {
 install_optional_topics() {
   info "🔍 Discovering optional system topics..."
 
-  [[ ! -d "$OPTIONAL_TOPICS" ]] && { warning "No optional topics directory found"; return 1; }
+  [[ ! -d "$OPTIONAL_TOPICS_DIR" ]] && { warning "No optional topics directory found"; return 1; }
 
   local installed=0 skipped=0 failed=0
   local -a topic_queue=()
@@ -296,7 +296,7 @@ install_optional_topics() {
   # Build processing queue
   while IFS= read -r -d '' installer; do
     topic_queue+=("$installer")
-  done < <(find "$OPTIONAL_TOPICS" -maxdepth 2 -name 'install.sh' -print0)
+  done < <(find "$OPTIONAL_TOPICS_DIR" -maxdepth 2 -name 'install.sh' -print0)
 
   info "📦 Found ${#topic_queue[@]} topics to process"
 
