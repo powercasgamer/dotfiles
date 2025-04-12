@@ -285,7 +285,7 @@ install_topics() {
 }
 
 # === Optional Topic Installer ===
-install_optional_topics() {
+NONEVERinstall_optional_topics() {
   info "🔍 Discovering optional system topics..."
 
   [[ ! -d "$OPTIONAL_TOPICS_DIR" ]] && { warning "No optional topics directory found"; return 1; }
@@ -380,10 +380,6 @@ main() {
   install_topics || {
       [[ "$FORCE" != true ]] && exit 1
   }
-
-#  install_optional_topics || {
-#    [[ "$FORCE" != true ]] && exit 1
-#  }
 
   install_global_zsh || {
     warning "Failed to install global Zsh config"
