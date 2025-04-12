@@ -1,1 +1,93 @@
-#!/usr/bin/env bash
+#!/usr/bin/env zsh
+
+paste() {
+  emulate -L zsh  # Ensure Zsh emulation mode
+  setopt extendedglob localoptions
+
+  local file="$1"
+  local lang="${2:-}"
+  local content_type="text/plain"
+  local filename extension
+
+  # Validate file exists and is readable
+  if [[ ! -f "$file" ]] || [[ ! -r "$file" ]]; then
+    echo >&2 "%F{red}Error:%f Cannot access file: %F{yellow}${file}%f"
+    return 1
+  fi
+
+  # Extract filename and extension (Zsh-specific parameter expansion)
+  filename=${file:t}
+  extension=${file:e:l}  # :e for extension, :l for lowercase
+
+  # Language to content-type mapping (strict text/<language> format)
+  local -A lang_map=(
+    log      log
+    sh      shell
+    bash    shell
+    zsh     shell
+    js      javascript
+    ts      typescript
+    py      python
+    java    java
+    kt      kotlin
+    kts      kotlin
+    go      go
+    rs      rust
+    rb      ruby
+    php     php
+    pl      perl
+    json    json
+    html    html
+    css     css
+    md      markdown
+    xml     xml
+    yml     yaml
+    yaml    yaml
+    c       c
+    cpp     cpp
+    h       c
+    hpp     cpp
+    cs      csharp
+  )
+
+  # Set content-type
+  if [[ -z "$lang" ]]; then
+    lang=${lang_map[$extension]:-plain}
+  fi
+  content_type="text/$lang"
+
+  # Upload with progress using Zsh colors
+  echo "%F{blue}Uploading%f %F{yellow}${filename}%f (%F{green}${content_type}%f)..." >&2
+
+  # Execute curl with proper error handling
+  local response
+  response=$(curl -sSf -T "$file" -H "Content-Type: $content_type" \
+    https://api.pastes.dev/post 2>&1)
+
+  local ret=$?
+  if [[ $ret -ne 0 ]]; then
+    echo "%F{red}Error%f ($ret): Failed to upload file" >&2
+    [[ -n "$response" ]] && echo "$response" >&2
+    return $ret
+  fi
+
+  # Process response
+  local url
+  if command -v jq &>/dev/null; then
+    url=$(echo "$response" | jq -r '.url // empty' 2>/dev/null)
+  else
+    url=$(echo "$response" | grep -oE '"url":"[^"]+"' | cut -d'"' -f4)
+  fi
+
+  if [[ -n "$url" ]]; then
+    echo "%F{green}Success!%f Paste URL: %F{cyan}${url}%f"
+    # Try to copy to clipboard (macOS/Linux)
+    if command -v pbcopy &>/dev/null; then
+      echo -n "$url" | pbcopy && echo "(URL copied to clipboard)"
+    elif command -v xclip &>/dev/null; then
+      echo -n "$url" | xclip -selection clipboard && echo "(URL copied to clipboard)"
+    fi
+  else
+    echo "$response"
+  fi
+}

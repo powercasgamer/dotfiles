@@ -1,0 +1,150 @@
+#!/usr/bin/env bash
+# setup-firewall - UFW Configuration Manager
+set -euo pipefail
+
+# Configuration directories
+CONFIG_DIR="/etc/setup-firewall"
+IP_LISTS_DIR="$CONFIG_DIR/ip_lists"
+mkdir -p "$IP_LISTS_DIR"
+
+# IP List URLs
+CLOUDFLARE_IPS_URL="https://www.cloudflare.com/ips-v4"
+TCPSHIELD_IPS_URL="https://tcpshield.com/v4"
+
+# Network Interfaces
+PELICAN_IFACE="pelican0"  # Adjust based on your setup
+DATABASE_NETWORK="10.0.0.0/24"  # Example database network
+
+function setup_cloudflare() {
+    echo "🌩️ Configuring Cloudflare firewall rules"
+
+    # Download latest Cloudflare IPs
+    curl -s "$CLOUDFLARE_IPS_URL" -o "$IP_LISTS_DIR/cloudflare_ips.txt"
+
+    # Get ports from user
+    read -p "Enter ports to open for Cloudflare (space-separated): " -a PORTS
+
+    # Allow Cloudflare IPs to specified ports
+    while read -r ip; do
+        for port in "${PORTS[@]}"; do
+            sudo ufw allow proto tcp from "$ip" to any port "$port" comment "Cloudflare"
+        done
+    done < "$IP_LISTS_DIR/cloudflare_ips.txt"
+
+    echo "✅ Cloudflare rules applied for ports: ${PORTS[*]}"
+}
+
+function setup_tcpshield() {
+    echo "🛡️ Configuring TCPShield firewall rules"
+
+    # Download latest TCPShield IPs
+    curl -s "$TCPSHIELD_IPS_URL" -o "$IP_LISTS_DIR/tcpshield_ips.txt"
+
+    # Get ports from user
+    read -p "Enter ports to open for TCPShield (space-separated): " -a PORTS
+
+    # Allow TCPShield IPs to specified ports
+    while read -r ip; do
+        for port in "${PORTS[@]}"; do
+            sudo ufw allow proto tcp from "$ip" to any port "$port" comment "TCPShield"
+        done
+    done < "$IP_LISTS_DIR/tcpshield_ips.txt"
+
+    echo "✅ TCPShield rules applied for ports: ${PORTS[*]}"
+}
+
+function setup_common() {
+    echo "🔧 Configuring common firewall rules"
+
+    # Default deny incoming
+    #sudo ufw default deny incoming
+
+    # Allow SSH (with rate limiting)
+    sudo ufw limit 22/tcp comment "SSH with rate limiting"
+
+    # Ping
+    sudo ufw allow icmp comment "ICMP (ping)"
+
+    echo "✅ Common rules applied (SSH, ICMP)"
+}
+
+function setup_pelican() {
+    echo "🦢 Configuring Pelican/Pterodactyl firewall rules"
+
+    # Default database ports
+    echo "🔹 Applying default database rules for Pelican network..."
+    sudo ufw allow in on pelican0 to 172.18.0.1 port 3306 proto tcp comment "Pelican MySQL"
+    sudo ufw allow in on pelican0 to 172.18.0.1 port 5432 proto tcp comment "Pelican PostgreSQL"
+    sudo ufw allow in on pelican0 to 172.18.0.1 port 6379 proto tcp comment "Pelican Redis"
+    sudo ufw allow in on pelican0 to 172.18.0.1 port 27017 proto tcp comment "Pelican MongoDB"
+
+    # Optional additional ports
+    read -p "Would you like to whitelist additional ports to 172.18.0.1? [y/N] " add_ports
+    if [[ "$add_ports" =~ ^[Yy]$ ]]; then
+        while true; do
+            read -p "Enter port to whitelist (or 'done' to finish): " port
+            [[ "$port" == "done" ]] && break
+
+            if [[ "$port" =~ ^[0-9]+$ ]]; then
+                sudo ufw allow in on pelican0 to 172.18.0.1 port "$port" proto tcp comment "Pelican Custom Port"
+                echo "✅ Whitelisted port $port on pelican0 → 172.18.0.1"
+            else
+                echo "❌ Invalid port number"
+            fi
+        done
+    fi
+
+    echo "✅ Pelican firewall configuration complete"
+    echo "   Summary of rules for pelican0:"
+    sudo ufw status | grep pelican0
+}
+
+function show_menu() {
+    echo "
+    ███████╗███████╗████████╗██╗   ██╗██████╗
+    ██╔════╝██╔════╝╚══██╔══╝██║   ██║██╔══██╗
+    ███████╗█████╗     ██║   ██║   ██║██████╔╝
+    ╚════██║██╔══╝     ██║   ██║   ██║██╔═══╝
+    ███████║███████╗   ██║   ╚██████╔╝██║
+    ╚══════╝╚══════╝   ╚═╝    ╚═════╝ ╚═╝
+    "
+    echo "1) Cloudflare Setup"
+    echo "2) TCPShield Setup"
+    echo "3) Common Setup (SSH, HTTP, HTTPS)"
+    echo "4) Pelican Setup"
+    echo "5) Enable Firewall"
+    echo "6) Disable Firewall"
+    echo "7) View Rules"
+    echo "8) Exit"
+}
+
+function main() {
+    # Ensure UFW is installed
+    if ! command -v ufw &> /dev/null; then
+        echo "❌ UFW is not installed. Installing now..."
+        sudo apt update
+        sudo apt install -y ufw
+    fi
+
+    while true; do
+        clear
+        show_menu
+        read -p "Select an option (1-8): " choice
+
+        case $choice in
+            1) setup_cloudflare ;;
+            2) setup_tcpshield ;;
+            3) setup_common ;;
+            4) setup_pelican ;;
+            5) sudo ufw enable ;;
+            6) sudo ufw disable ;;
+            7) sudo ufw status numbered ;;
+            8) exit 0 ;;
+            *) echo "Invalid option"; sleep 1 ;;
+        esac
+
+        read -p "Press Enter to continue..."
+    done
+}
+
+main "$@"

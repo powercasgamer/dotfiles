@@ -26,6 +26,7 @@ SYSTEM_CONFIG_DIR="$DOTFILES_SYSTEM_DIR/system"  # Where system configs will be 
 SYSTEM_BIN_SOURCE="$DOTFILES_SYSTEM_DIR/bin"
 GLOBAL_BIN_TARGET="/usr/local/bin"  # System-wide binary location
 TOPICS_DIR="$SYSTEM_CONFIG_DIR/topics"
+TOPICS_DIR="$SYSTEM_CONFIG_DIR/optional-topics"
 
 # === Runtime Options ===
 VERBOSE=false
@@ -71,6 +72,71 @@ clone_dotfiles() {
   fi
 
   success "Dotfiles repository ready at $DOTFILES_SYSTEM_DIR"
+}
+
+# === Dependency Installer ===
+install_required_dependencies() {
+  local common_packages=("git" "curl" "wget" "zip" "unzip" "tar" "zsh" "jq")
+  local os_type=$(check_os)
+  local install_success=true
+
+  echo "DEBUG: Detected OS type: '$os_type'" >&2
+
+  case "$os_type" in
+    debian-*|ubuntu-*|pop-*|linuxmint-*)
+      info "Installing Linux dependencies..."
+      if ! sudo apt update -qy; then
+        error "Failed to update package lists"
+        return 1
+      fi
+      if ! sudo apt install -y "${common_packages[@]}"; then
+        error "Failed to install packages"
+        install_success=false
+      fi
+      ;;
+
+    *macos*)
+      info "Checking for macOS dependencies..."
+      if ! command -v brew >/dev/null; then
+        warning "Homebrew not found. Some dependencies may be missing."
+        install_success=false
+      else
+        if ! brew install "${common_packages[@]}"; then
+          error "Failed to install packages via Homebrew"
+          install_success=false
+        fi
+      fi
+      ;;
+
+    fedora-*|centos-*|rhel-*)
+      info "Installing RPM-based dependencies..."
+      if ! sudo dnf install -y "${common_packages[@]}"; then
+        error "Failed to install packages via dnf"
+        install_success=false
+      fi
+      ;;
+
+    arch-*)
+      info "Installing Arch Linux dependencies..."
+      if ! sudo pacman -Sy --noconfirm "${common_packages[@]}"; then
+        error "Failed to install packages via pacman"
+        install_success=false
+      fi
+      ;;
+
+    *)
+      warning "Unsupported OS: $os_type. Skipping dependency installation."
+      return 1
+      ;;
+  esac
+
+  if $install_success; then
+    success "Dependencies installed successfully!"
+    return 0
+  else
+    error "Some dependencies failed to install"
+    return 1
+  fi
 }
 
 # === Requirement Checking ===
@@ -249,6 +315,72 @@ install_topics() {
   return 0
 }
 
+# === Optional Topic Installer ===
+install_optional_topics() {
+  info "🔍 Discovering optional system topics..."
+
+  [[ ! -d "$OPTIONAL_TOPICS" ]] && { warning "No optional topics directory found"; return 1; }
+
+  local installed=0 skipped=0 failed=0
+  local -a topic_queue=()
+
+  # Build processing queue
+  while IFS= read -r -d '' installer; do
+    topic_queue+=("$installer")
+  done < <(find "$OPTIONAL_TOPICS" -maxdepth 2 -name 'install.sh' -print0)
+
+  info "📦 Found ${#topic_queue[@]} topics to process"
+
+  for installer in "${topic_queue[@]}"; do
+    local topic_dir=$(dirname "$installer")
+    local topic_name=$(basename "$topic_dir")
+
+    # Check requirements
+    if [[ -f "$topic_dir/.requires" ]]; then
+      if ! check_requirements "$topic_dir/.requires"; then
+        warning "⏩ Skipping $topic_name (missing requirements)"
+        ((skipped++))
+        continue
+      fi
+    fi
+
+    info "🏷️  Processing: $topic_name"
+
+    if [[ "$DRY_RUN" == true ]]; then
+      echo "   [DRY RUN] Would execute: $installer"
+      [[ -f "$topic_dir/post-install.sh" ]] && \
+        echo "   [DRY RUN] Would run post-install hook"
+      ((skipped++))
+      continue
+    fi
+
+    # Run install hook
+    if ! run_hook "install" "$topic_dir" "$topic_name"; then
+      [[ "$FORCE" == true ]] && ((skipped++)) || ((failed++))
+      continue
+    fi
+
+    # Run post-install hook if exists
+    if ! run_hook "post-install" "$topic_dir" "$topic_name"; then
+      [[ "$FORCE" == true ]] && ((skipped++)) || ((failed++))
+      continue
+    fi
+
+    success "   ✅ Successfully processed: $topic_name"
+    ((installed++))
+  done
+
+  # Print summary
+  echo ""
+  success "📊 Processing Summary:"
+  echo "   - ✅ $installed succeeded"
+  echo "   - ⏩ $skipped skipped"
+  [[ $failed -gt 0 ]] && warning "   - ❌ $failed failed"
+
+  [[ $failed -gt 0 && "$FORCE" != true ]] && return 1
+  return 0
+}
+
 # === Main ===
 main() {
   # Parse arguments
@@ -278,7 +410,11 @@ main() {
 
   install_topics || {
       [[ "$FORCE" != true ]] && exit 1
-    }
+  }
+
+#  install_optional_topics || {
+#    [[ "$FORCE" != true ]] && exit 1
+#  }
 
   install_global_zsh || {
     warning "Failed to install global Zsh config"

@@ -1,0 +1,51 @@
+#!/usr/bin/env bash
+# Secure APT Wrapper - Enhanced Version
+set -euo pipefail
+
+# Blocked packages (supports wildcards)
+BLOCKED_PKGS=(
+  # Web Servers
+  "nginx*" "apache2*" "lighttpd*" "tomcat*" "jetty*" "openresty*"
+
+  # Security Risks
+  "telnet*" "rsh-*" "netcat*" "nc*" "john*" "hydra*" "ophcrack*" "hashcat*"
+
+  # Debugging/Tools
+  "nmap*" "wireshark*" "sniffit*" "kismet*" "aircrack-ng*"
+
+  # Unnecessary Services
+ "exim4*"
+)
+
+# Admin override detection
+ADMIN_OVERRIDE=false
+for arg in "$@"; do
+  if [[ "$arg" == "--force" ]]; then
+    ADMIN_OVERRIDE=true
+    # Remove --force from arguments
+    set -- "${@/--force/}"
+    break
+  fi
+done
+
+# Check if command should be blocked
+should_block() {
+  [[ "$1" =~ ^(install|remove|purge)$ ]] || return 1
+  for arg in "${@:2}"; do
+    for pattern in "${BLOCKED_PKGS[@]}"; do
+      if [[ "$arg" == $pattern ]]; then
+        return 0
+      fi
+    done
+  done
+  return 1
+}
+
+# Main execution
+if ! $ADMIN_OVERRIDE && should_block "$@"; then
+  echo >&2 "🚫 Security Policy: Blocked package detected in '$0 $*'"
+  echo >&2 "   Contact the system administrator for assistance."
+  exit 1
+fi
+
+exec "/usr/bin/$(basename "$0")" "$@"

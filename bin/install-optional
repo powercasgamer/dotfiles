@@ -1,0 +1,179 @@
+#!/usr/bin/env bash
+# Self-Installing Optional Topic Installer with Auto-Completion
+set -euo pipefail
+
+# Configuration
+DOTFILES_ROOT="/usr/local/share/dotfiles-system"
+TOPICS_DIR="${DOTFILES_ROOT}/system/optional-topics"  # Note the optional-topics directory
+COMPLETION_INSTALLED=false
+
+# Colorized output
+function info() { echo -e "\033[34m[INFO]\033[0m $*"; }
+function success() { echo -e "\033[32m[✓]\033[0m $*"; }
+function warning() { echo -e "\033[33m[!]\033[0m $*"; }
+function error() { echo -e "\033[31m[✗]\033[0m $*" >&2; exit 1; }
+
+# ==================== COMPLETION SETUP ====================
+function setup_completion() {
+  # Bash completion
+  local bash_comp="/etc/bash_completion.d/install_optional"
+  sudo mkdir -p "$(dirname "$bash_comp")"
+  cat <<EOF | sudo tee "$bash_comp" >/dev/null
+_install_optional_completion() {
+  [[ ! -d "${TOPICS_DIR}" ]] && return
+  local cur=\${COMP_WORDS[COMP_CWORD]}
+  COMPREPLY=(\$(compgen -W "\$(find "${TOPICS_DIR}" -mindepth 1 -maxdepth 1 -type d -printf '%f\n' 2>/dev/null)" -- "\$cur"))
+}
+complete -F _install_optional_completion install-optional 2>/dev/null || true
+EOF
+
+  # Zsh completion
+  local zsh_comp="/usr/share/zsh/site-functions/_install_optional"
+  sudo mkdir -p "$(dirname "$zsh_comp")"
+  cat <<EOF | sudo tee "$zsh_comp" >/dev/null
+#compdef install-optional
+_install_optional() {
+  [[ ! -d "${TOPICS_DIR}" ]] && return
+  local -a topics
+  topics=(\$(find "${TOPICS_DIR}" -mindepth 1 -maxdepth 1 -type d -exec basename {} \; 2>/dev/null))
+  _describe 'topics' topics
+}
+_install_optional
+EOF
+
+  # Apply to current shell
+  if [[ -n "${ZSH_VERSION:-}" ]]; then
+    autoload -Uz compinit
+    compinit -i 2>/dev/null || true
+  elif [[ -f "$bash_comp" ]]; then
+    source "$bash_comp" 2>/dev/null || true
+  fi
+
+  COMPLETION_INSTALLED=true
+  success "Tab completion installed for install-optional"
+}
+
+# ==================== AUTO-INSTALL COMPLETION ====================
+function ensure_completion() {
+  # Check if completion is already set up
+  if [[ -n "${ZSH_VERSION:-}" ]]; then
+    which _install_optional >/dev/null 2>&1 && return
+  else
+    complete -p install-optional 2>/dev/null | grep -q '_install_optional_completion' && return
+  fi
+
+  # First-run installation
+  warning "First run detected - setting up tab completion..."
+  setup_completion
+}
+
+# ==================== TOPIC OPERATIONS ====================
+function list_available_topics() {
+  [[ ! -d "$TOPICS_DIR" ]] && return
+  find "$TOPICS_DIR" -mindepth 1 -maxdepth 1 -type d -printf '%f\n' | sort
+}
+
+function install_optional_topic() {
+  local topic="$1"
+  local topic_dir="${TOPICS_DIR}/${topic}"
+  local install_script="${topic_dir}/install.sh"
+
+  # Validation checks
+  [[ ! -d "$topic_dir" ]] && error "Topic directory not found: $topic"
+  [[ ! -f "$install_script" ]] && error "No install script for topic: $topic"
+
+  # Check requirements if they exist
+  if [[ -f "${topic_dir}/.requires" ]]; then
+    info "🔍 Checking requirements for: \033[1m${topic}\033[0m"
+    if ! check_requirements "${topic_dir}/.requires"; then
+      error "Missing requirements for topic: $topic"
+    fi
+  fi
+
+  info "🏷️  Installing optional topic: \033[1m${topic}\033[0m"
+
+  # Run install script
+  if ! bash "$install_script"; then
+    error "Installation failed for topic: $topic"
+  fi
+
+  # Run post-install hook if exists
+  if [[ -f "${topic_dir}/post-install.sh" ]]; then
+    info "⚡ Running post-install hook for: \033[1m${topic}\033[0m"
+    if ! bash "${topic_dir}/post-install.sh"; then
+      error "Post-install hook failed for topic: $topic"
+    fi
+  fi
+
+  success "✅ Successfully installed topic: \033[1m${topic}\033[0m"
+}
+
+# Helper function to check requirements
+function check_requirements() {
+  local requirements_file="$1"
+  while IFS= read -r requirement; do
+    # Skip empty lines and comments
+    [[ -z "$requirement" || "$requirement" =~ ^# ]] && continue
+
+    # Check if command exists
+    if ! command -v "$requirement" &>/dev/null; then
+      warning "Missing requirement: $requirement"
+      return 1
+    fi
+  done < "$requirements_file"
+  return 0
+}
+
+# ==================== MAIN HANDLER ====================
+function main() {
+  # Auto-install completion on first run
+  ensure_completion
+
+  case "${1:-}" in
+    --setup-completion)
+      setup_completion
+      ;;
+    --list|-l)
+      echo "Available optional topics:"
+      list_available_topics | sed 's/^/  /'
+      ;;
+    --help|-h)
+      show_help
+      ;;
+    "")
+      show_help
+      error "No topic specified"
+      ;;
+    *)
+      install_optional_topic "$1"
+      ;;
+  esac
+}
+
+function show_help() {
+  cat <<EOF
+Optional Topic Installer
+
+Usage:
+  install_optional [topic]    Install a specific optional topic
+  install_optional --list     List available optional topics
+  install_optional --help     Show this help
+
+First run will automatically set up tab completion.
+EOF
+}
+
+# ==================== COMPLETION ENTRY POINT ====================
+# Special case when being sourced for completion
+if [[ "${BASH_SOURCE[0]}" != "$0" ]]; then
+  if [[ -n "${COMP_WORDS:-}" ]]; then
+    # Called during completion attempt
+    ensure_completion
+    return 0
+  fi
+  # Just being sourced normally
+  return 0
+fi
+
+# Run as main command
+main "$@"
