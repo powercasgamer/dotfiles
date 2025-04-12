@@ -12,7 +12,7 @@ function install_zsh() {
   if ! command -v zsh >/dev/null; then
     info "Installing ZSH package..."
     sudo apt-get update -qq
-    sudo apt-get install.sh -y --no-install-recommends zsh
+    sudo apt-get install -y --no-install-recommends zsh
     success "ZSH installed successfully"
   else
     success "ZSH is already installed (version: $(zsh --version))"
