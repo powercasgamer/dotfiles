@@ -26,7 +26,7 @@ SYSTEM_CONFIG_DIR="$DOTFILES_SYSTEM_DIR/system"  # Where system configs will be 
 SYSTEM_BIN_SOURCE="$DOTFILES_SYSTEM_DIR/bin"
 GLOBAL_BIN_TARGET="/usr/local/bin"  # System-wide binary location
 TOPICS_DIR="$SYSTEM_CONFIG_DIR/topics"
-TOPICS_DIR="$SYSTEM_CONFIG_DIR/optional-topics"
+OPTIONAL_TOPICS_DIR="$SYSTEM_CONFIG_DIR/optional-topics"
 
 # === Runtime Options ===
 VERBOSE=false
