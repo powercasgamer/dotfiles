@@ -17,6 +17,16 @@ fi
 function speedup_apt() {
   info "Starting APT optimization..."
 
+    info "Installing core APT dependencies..."
+    apt update
+    apt install -y \
+      apt-transport-https \
+      software-properties-common \
+      ca-certificates \
+      gnupg \
+      curl \
+      wget
+
   # 1. Smart IPv6 handling
   info "Testing network connectivity..."
   if ! ping -c 1 -4 archive.ubuntu.com &>/dev/null &&
@@ -29,19 +39,20 @@ function speedup_apt() {
   fi
 
   # 2. Install netselect-apt
-  if ! command -v netselect-apt &>/dev/null; then
-    apt install -y netselect-apt
-    success "netselect-apt installed"
-  fi
-
-  # 3. Find fastest mirrors
-  info "Finding fastest mirrors..."
-  if netselect-apt -n -o /etc/apt/sources.list; then
-    success "Mirrors optimized"
-  else
-    warning "Mirror optimization failed, using defaults"
-    cp /etc/apt/sources.list.bak /etc/apt/sources.list 2>/dev/null || true
-  fi
+#  if ! command -v netselect-apt &>/dev/null; then
+#    apt update
+#    apt install -y netselect-apt
+#    success "netselect-apt installed"
+#  fi
+#
+#  # 3. Find fastest mirrors
+#  info "Finding fastest mirrors..."
+#  if netselect-apt -n -o /etc/apt/sources.list; then
+#    success "Mirrors optimized"
+#  else
+#    warning "Mirror optimization failed, using defaults"
+#    cp /etc/apt/sources.list.bak /etc/apt/sources.list 2>/dev/null || true
+#  fi
 
   # 4. Configure dpkg options
   cat <<EOF | tee /etc/apt/apt.conf.d/local >/dev/null
