@@ -74,71 +74,6 @@ clone_dotfiles() {
   success "Dotfiles repository ready at $DOTFILES_SYSTEM_DIR"
 }
 
-# === Dependency Installer ===
-install_required_dependencies() {
-  local common_packages=("git" "curl" "wget" "zip" "unzip" "tar" "zsh" "jq")
-  local os_type=$(check_os)
-  local install_success=true
-
-  echo "DEBUG: Detected OS type: '$os_type'" >&2
-
-  case "$os_type" in
-    debian-*|ubuntu-*|pop-*|linuxmint-*)
-      info "Installing Linux dependencies..."
-      if ! sudo apt update -qy; then
-        error "Failed to update package lists"
-        return 1
-      fi
-      if ! sudo apt install -y "${common_packages[@]}"; then
-        error "Failed to install packages"
-        install_success=false
-      fi
-      ;;
-
-    *macos*)
-      info "Checking for macOS dependencies..."
-      if ! command -v brew >/dev/null; then
-        warning "Homebrew not found. Some dependencies may be missing."
-        install_success=false
-      else
-        if ! brew install "${common_packages[@]}"; then
-          error "Failed to install packages via Homebrew"
-          install_success=false
-        fi
-      fi
-      ;;
-
-    fedora-*|centos-*|rhel-*)
-      info "Installing RPM-based dependencies..."
-      if ! sudo dnf install -y "${common_packages[@]}"; then
-        error "Failed to install packages via dnf"
-        install_success=false
-      fi
-      ;;
-
-    arch-*)
-      info "Installing Arch Linux dependencies..."
-      if ! sudo pacman -Sy --noconfirm "${common_packages[@]}"; then
-        error "Failed to install packages via pacman"
-        install_success=false
-      fi
-      ;;
-
-    *)
-      warning "Unsupported OS: $os_type. Skipping dependency installation."
-      return 1
-      ;;
-  esac
-
-  if $install_success; then
-    success "Dependencies installed successfully!"
-    return 0
-  else
-    error "Some dependencies failed to install"
-    return 1
-  fi
-}
-
 # === Requirement Checking ===
 check_requirements() {
   local requirement_file="$1"
@@ -183,7 +118,7 @@ install_global_zsh() {
 
 # === Run Installation Hook ===
 run_hook() {
-  local hook_type="$1"  # "install" or "post-install"
+  local hook_type="$1"  # "install.sh" or "post-install.sh"
   local topic_dir="$2"
   local topic_name="$3"
 
@@ -255,15 +190,48 @@ install_topics() {
 
   [[ ! -d "$TOPICS_DIR" ]] && { warning "No topics directory found"; return 1; }
 
+  # Define explicit installation order (modify as needed)
+  local priority_order=("system" "essential" "zsh")
   local installed=0 skipped=0 failed=0
-  local -a topic_queue=()
+  local -a topic_queue=() remaining_topics=()
 
-  # Build processing queue
+  # Build processing queues
   while IFS= read -r -d '' installer; do
-    topic_queue+=("$installer")
+    local topic_dir=$(dirname "$installer")
+    local topic_name=$(basename "$topic_dir")
+
+    # Check if topic is in priority list
+    local is_priority=false
+    for prio_topic in "${priority_order[@]}"; do
+      if [[ "$topic_name" == "$prio_topic" ]]; then
+        is_priority=true
+        break
+      fi
+    done
+
+    if $is_priority; then
+      # Add to priority queue (will be sorted later)
+      topic_queue+=("$installer")
+    else
+      # Add to regular queue
+      remaining_topics+=("$installer")
+    fi
   done < <(find "$TOPICS_DIR" -maxdepth 2 -name 'install.sh' -print0)
 
-  info "📦 Found ${#topic_queue[@]} topics to process"
+  # Sort priority topics according to defined order
+  local -a sorted_queue=()
+  for prio_topic in "${priority_order[@]}"; do
+    for installer in "${topic_queue[@]}"; do
+      if [[ "$(basename "$(dirname "$installer")")" == "$prio_topic" ]]; then
+        sorted_queue+=("$installer")
+      fi
+    done
+  done
+
+  # Combine queues (priority topics first)
+  topic_queue=("${sorted_queue[@]}" "${remaining_topics[@]}")
+
+  info "📦 Found ${#topic_queue[@]} topics to process (${#sorted_queue[@]} priority topics)"
 
   for installer in "${topic_queue[@]}"; do
     local topic_dir=$(dirname "$installer")
@@ -288,13 +256,13 @@ install_topics() {
       continue
     fi
 
-    # Run install hook
+    # Run install.sh hook
     if ! run_hook "install" "$topic_dir" "$topic_name"; then
       [[ "$FORCE" == true ]] && ((skipped++)) || ((failed++))
       continue
     fi
 
-    # Run post-install hook if exists
+    # Run post-install.sh hook if exists
     if ! run_hook "post-install" "$topic_dir" "$topic_name"; then
       [[ "$FORCE" == true ]] && ((skipped++)) || ((failed++))
       continue
@@ -310,6 +278,7 @@ install_topics() {
   echo "   - ✅ $installed succeeded"
   echo "   - ⏩ $skipped skipped"
   [[ $failed -gt 0 ]] && warning "   - ❌ $failed failed"
+  echo "   - Priority order: ${priority_order[*]}"
 
   [[ $failed -gt 0 && "$FORCE" != true ]] && return 1
   return 0
@@ -354,13 +323,13 @@ install_optional_topics() {
       continue
     fi
 
-    # Run install hook
+    # Run install.sh hook
     if ! run_hook "install" "$topic_dir" "$topic_name"; then
       [[ "$FORCE" == true ]] && ((skipped++)) || ((failed++))
       continue
     fi
 
-    # Run post-install hook if exists
+    # Run post-install.sh hook if exists
     if ! run_hook "post-install" "$topic_dir" "$topic_name"; then
       [[ "$FORCE" == true ]] && ((skipped++)) || ((failed++))
       continue

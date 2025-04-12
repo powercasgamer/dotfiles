@@ -17,20 +17,24 @@ fi
 function speedup_apt() {
   info "Starting APT optimization..."
 
-    info "Installing core APT dependencies..."
-    apt update
-    apt install -y \
-      apt-transport-https \
-      software-properties-common \
-      ca-certificates \
-      gnupg \
-      curl \
-      wget
+  info "Installing core APT dependencies..."
+  apt update
+  packages=(
+    "apt-transport-https"
+    "software-properties-common"
+    "ca-certificates"
+    "gnupg"
+    "curl"
+    "wget"
+    "git"
+  )
+
+  apt install -y "${packages[@]}"
 
   # 1. Smart IPv6 handling
   info "Testing network connectivity..."
   if ! ping -c 1 -4 archive.ubuntu.com &>/dev/null &&
-     ping -c 1 -6 archive.ubuntu.com &>/dev/null; then
+    ping -c 1 -6 archive.ubuntu.com &>/dev/null; then
     info "Forcing APT to use IPv4 (no IPv4 connectivity detected)"
     echo 'Acquire::ForceIPv4 "true";' | tee /etc/apt/apt.conf.d/99force-ipv4 >/dev/null
   else
@@ -39,20 +43,20 @@ function speedup_apt() {
   fi
 
   # 2. Install netselect-apt
-#  if ! command -v netselect-apt &>/dev/null; then
-#    apt update
-#    apt install -y netselect-apt
-#    success "netselect-apt installed"
-#  fi
-#
-#  # 3. Find fastest mirrors
-#  info "Finding fastest mirrors..."
-#  if netselect-apt -n -o /etc/apt/sources.list; then
-#    success "Mirrors optimized"
-#  else
-#    warning "Mirror optimization failed, using defaults"
-#    cp /etc/apt/sources.list.bak /etc/apt/sources.list 2>/dev/null || true
-#  fi
+  #  if ! command -v netselect-apt &>/dev/null; then
+  #    apt update
+  #    apt install.sh -y netselect-apt
+  #    success "netselect-apt installed"
+  #  fi
+  #
+  #  # 3. Find fastest mirrors
+  #  info "Finding fastest mirrors..."
+  #  if netselect-apt -n -o /etc/apt/sources.list; then
+  #    success "Mirrors optimized"
+  #  else
+  #    warning "Mirror optimization failed, using defaults"
+  #    cp /etc/apt/sources.list.bak /etc/apt/sources.list 2>/dev/null || true
+  #  fi
 
   # 4. Configure dpkg options
   cat <<EOF | tee /etc/apt/apt.conf.d/local >/dev/null
@@ -207,10 +211,10 @@ function main() {
 
   # System Hardening
   secure_apt
-#  harden_kernel
+  #  harden_kernel
   setup_fail2ban
   optimize_systemd
-#  enable_autoupdates
+  #  enable_autoupdates
 
   success "All optimizations complete!"
   echo "Recommended checks:"

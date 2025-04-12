@@ -47,7 +47,7 @@ zinit snippet OMZL::clipboard.zsh     # Clipboard integration
 zinit snippet OMZL::termsupport.zsh   # Terminal window/tab title support
 
 # Load Powerlevel10k theme
-zinit ice depth"1"  # Shallow clone for faster install
+zinit ice depth"1"  # Shallow clone for faster install.sh
 zinit light romkatv/powerlevel10k
 
 # Configure LS_COLORS (better `ls` colors)
@@ -93,7 +93,7 @@ load_zsh_topics() {
       source "$zsh_file"
     done
 
-    # 3. Thirdly: Run install.sh if exists
+    # 3. Thirdly: Run install.sh.sh if exists
     [[ -f "$topic_dir/install.sh" ]] && {
       echo "⚙️ Installing ${topic_dir##*/}"
       (cd "$topic_dir" && bash install.sh)

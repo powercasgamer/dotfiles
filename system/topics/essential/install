@@ -1,0 +1,63 @@
+#!/usr/bin/env bash
+# Essential system dependencies installer
+set -euo pipefail
+
+DOTFILES_ROOT="/usr/local/share/dotfiles-system"
+source "${DOTFILES_ROOT}/system/scripts/logging.sh"
+
+function install_essential() {
+  info "Installing essential system dependencies..."
+
+  # Base packages for all systems
+  local base_packages=(
+    build-essential
+    curl
+    wget
+    git
+    gnupg
+    software-properties-common
+    apt-transport-https
+    ca-certificates
+    unzip
+    zip
+    tar
+    htop
+    jq
+  )
+
+  # Distro-specific packages
+  case "$(lsb_release -is)" in
+    Ubuntu|Debian)
+      base_packages+=(
+        ubuntu-drivers-common
+        libssl-dev
+        zlib1g-dev
+        libreadline-dev
+        llvm
+        libncurses5-dev
+        libffi-dev
+        libsqlite3-dev
+      )
+      ;;
+  esac
+
+  # Install packages
+  if ! sudo apt-get update -qq; then
+    error "Failed to update package lists"
+    return 1
+  fi
+
+  if ! sudo apt-get install -y --no-install-recommends "${base_packages[@]}"; then
+    error "Failed to install essential packages"
+    return 1
+  fi
+
+  # Additional system configuration
+  if ! sudo timedatectl set-timezone UTC; then
+    warning "Could not set timezone to UTC (continuing anyway)"
+  fi
+
+  success "Essential dependencies installed successfully"
+}
+
+install_essential
