@@ -4,7 +4,7 @@ set -euo pipefail
 
 # Configuration
 ENABLE_AUTH=true
-BIND_LOCAL=false  # Default to binding to all interfaces
+BIND_LOCAL=false # Default to binding to all interfaces
 ROOT_PASSWORD=""
 CREATE_SAMPLE_DB=false
 SAMPLE_DB_NAME="testdb"
@@ -15,7 +15,10 @@ SAMPLE_DB_PASS="testpass123"
 function info() { echo -e "\033[34m[INFO]\033[0m $*"; }
 function success() { echo -e "\033[32m[✓]\033[0m $*"; }
 function warning() { echo -e "\033[33m[!]\033[0m $*"; }
-function error() { echo -e "\033[31m[✗]\033[0m $*" >&2; exit 1; }
+function error() {
+  echo -e "\033[31m[✗]\033[0m $*" >&2
+  exit 1
+}
 
 # ==================== INSTALL MARIA DB ====================
 function install_mariadb() {
@@ -100,7 +103,9 @@ function configure_mariadb() {
 
   # Find the appropriate config file location
   local config_file
-  if [[ -f /etc/mysql/my.cnf ]]; then
+  if [[ -f /etc/mysql/mariadb.conf.d/50-server.cnf ]]; then
+    config_file="/etc/mysql/mariadb.conf.d/50-server.cnf"
+  elif [[ -f /etc/mysql/my.cnf ]]; then
     config_file="/etc/mysql/my.cnf"
   elif [[ -f /etc/my.cnf ]]; then
     config_file="/etc/my.cnf"
@@ -122,7 +127,7 @@ function configure_mariadb() {
   fi
 
   # Performance tuning
-  cat <<EOF >> "$config_file"
+  cat <<EOF >>"$config_file"
 
 # Performance tuning
 [mysqld]
@@ -198,28 +203,28 @@ function main() {
 # Parse arguments
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --bind-local)
-      BIND_LOCAL=true
-      shift
-      ;;
-    --no-auth)
-      ENABLE_AUTH=false
-      shift
-      ;;
-    --root-pass)
-      ROOT_PASSWORD="$2"
-      shift 2
-      ;;
-    --create-sample-db)
-      CREATE_SAMPLE_DB=true
-      shift
-      ;;
-    --help|-h)
-      show_usage
-      ;;
-    *)
-      error "Unknown option: $1"
-      ;;
+  --bind-local)
+    BIND_LOCAL=true
+    shift
+    ;;
+  --no-auth)
+    ENABLE_AUTH=false
+    shift
+    ;;
+  --root-pass)
+    ROOT_PASSWORD="$2"
+    shift 2
+    ;;
+  --create-sample-db)
+    CREATE_SAMPLE_DB=true
+    shift
+    ;;
+  --help | -h)
+    show_usage
+    ;;
+  *)
+    error "Unknown option: $1"
+    ;;
   esac
 done
 

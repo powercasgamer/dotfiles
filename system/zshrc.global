@@ -20,6 +20,8 @@ zstyle ':completion:*' list-colors "${(s.:.)LS_COLORS}" # Colorful completion
 export EDITOR=nano              # Default editor (safe choice)
 export PAGER=less               # Default pager
 export LESS='-R'                # Color support in less
+export LANG=en_US.UTF-8
+export LC_ALL=en_US.UTF-8
 
 # ---- Safety Defaults ----
 umask 022                       # Sensible default permissions

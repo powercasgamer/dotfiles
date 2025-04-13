@@ -57,21 +57,55 @@ check_os() {
 clone_dotfiles() {
   info "Cloning dotfiles repository..."
 
-  if [[ ! -d "$DOTFILES_SYSTEM_DIR" ]]; then
+  # Function to clean and reclone the repository
+  reclone_repository() {
+    warning "Resetting dotfiles repository due to conflicts/errors..."
+    sudo rm -rf "$DOTFILES_SYSTEM_DIR"
     sudo git clone "$DOTFILES_REPO" "$DOTFILES_SYSTEM_DIR"
     sudo chmod 755 "$DOTFILES_SYSTEM_DIR"
+  }
+
+  # First-time clone
+  if [[ ! -d "$DOTFILES_SYSTEM_DIR" ]]; then
+    if ! sudo git clone "$DOTFILES_REPO" "$DOTFILES_SYSTEM_DIR"; then
+      error "Failed to clone dotfiles repository!"
+      return 1
+    fi
+    sudo chmod 755 "$DOTFILES_SYSTEM_DIR"
   else
+    # Existing repository - attempt to update
     info "Updating existing dotfiles..."
-    sudo git -C "$DOTFILES_SYSTEM_DIR" pull
+
+    # Check if the directory is a git repository
+    if ! sudo git -C "$DOTFILES_SYSTEM_DIR" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+      warning "Directory exists but is not a git repository - recreating..."
+      reclone_repository
+    else
+      # Check for uncommitted changes
+      if [[ -n $(sudo git -C "$DOTFILES_SYSTEM_DIR" status -s) ]]; then
+        warning "Found uncommitted changes - stashing them..."
+        if ! sudo git -C "$DOTFILES_SYSTEM_DIR" stash; then
+          error "Failed to stash changes - resetting repository..."
+          reclone_repository
+        fi
+      fi
+
+      # Attempt to pull changes
+      if ! sudo git -C "$DOTFILES_SYSTEM_DIR" pull; then
+        warning "Pull failed due to conflicts - resetting repository..."
+        reclone_repository
+      fi
+    fi
   fi
 
   # Verify system folder exists
   if [[ ! -d "$DOTFILES_SYSTEM_DIR/system" ]]; then
-    warning "No 'system' folder found in dotfiles repository!"
+    error "No 'system' folder found in dotfiles repository!"
     return 1
   fi
 
   success "Dotfiles repository ready at $DOTFILES_SYSTEM_DIR"
+  return 0
 }
 
 # === Requirement Checking ===

@@ -42,14 +42,14 @@ function configure_ufw() {
   # Get Tailscale interface
   local tailscale_iface=$(ip -o -4 route show to 100.64.0.0/10 | awk '{print $3}')
 
-if [[ -n "$tailscale_iface" ]]; then
-#  # Check if the SSH allow rule exists without a comment
-#  if ufw status | grep -qE "^\[.*\]\s+ALLOW\s+.*$SSH_PORT/tcp\s+\(.*\)$"; then
-#    info "Skipping removal of SSH allow rule as it has a comment"
-#  else
-#    # Remove existing SSH allow rule if it exists and has no comment
-#    ufw delete allow "$SSH_PORT/tcp" >/dev/null 2>&1 || true
-#  fi
+  if [[ -n "$tailscale_iface" ]]; then
+    #  # Check if the SSH allow rule exists without a comment
+    #  if ufw status | grep -qE "^\[.*\]\s+ALLOW\s+.*$SSH_PORT/tcp\s+\(.*\)$"; then
+    #    info "Skipping removal of SSH allow rule as it has a comment"
+    #  else
+    #    # Remove existing SSH allow rule if it exists and has no comment
+    #    ufw delete allow "$SSH_PORT/tcp" >/dev/null 2>&1 || true
+    #  fi
 
     # Allow SSH only from Tailscale network
     ufw allow in on "$tailscale_iface" to any port "$SSH_PORT" proto tcp
@@ -71,15 +71,7 @@ if [[ -n "$tailscale_iface" ]]; then
 function install_tailscale() {
   info "Installing Tailscale..."
 
-  # Add repo
-  curl -fsSL https://pkgs.tailscale.com/stable/ubuntu/$(lsb_release -cs).gpg | \
-    tee /usr/share/keyrings/tailscale-archive-keyring.gpg >/dev/null
-  curl -fsSL https://pkgs.tailscale.com/stable/ubuntu/$(lsb_release -cs).list | \
-    tee /etc/apt/sources.list.d/tailscale.list >/dev/null
-
-  # Install
-  apt update
-  apt install -y tailscale ufw
+  curl -fsSL https://tailscale.com/install.sh | sh
 
   # Enable IP forwarding
   echo 'net.ipv4.ip_forward = 1' | tee /etc/sysctl.d/99-tailscale.conf

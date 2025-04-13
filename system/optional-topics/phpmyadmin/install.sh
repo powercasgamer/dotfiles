@@ -58,7 +58,7 @@ function install_packages() {
       php${PHP_VERSION}-json \
       php${PHP_VERSION}-curl
 
-    sudo phpenmod -v $PHP_VERSION mbstring
+#    sudo phpenmod -v $PHP_VERSION  # sus
 
   # RHEL/CentOS
   elif command -v dnf &>/dev/null; then
@@ -73,9 +73,9 @@ function install_packages() {
   fi
 
   # Symlink phpMyAdmin
-  if [[ ! -L "${CADDY_ROOT}/phpmyadmin" ]]; then
-    sudo ln -s "$PMADIR" "${CADDY_ROOT}/phpmyadmin"
-  fi
+#  if [[ ! -L "${CADDY_ROOT}/phpmyadmin" ]]; then
+#    sudo ln -s "$PMADIR" "${CADDY_ROOT}/phpmyadmin"
+#  fi
 }
 
 # ==================== CADDY CONFIGURATION ====================
@@ -91,7 +91,7 @@ function configure_caddy() {
   sudo mkdir -p "$CADDY_CONFIG_DIR"
   sed \
     -e "s/{{hostname}}/$(hostname)/g" \
-    -e "s|{{webroot}}|${CADDY_ROOT}|g" \
+    -e "s|{{webroot}}|${PMADIR}|g" \
     -e "s/{{admin_user}}/${admin_user}/g" \
     -e "s|{{hashed_password}}|${hashed_password}|g" \
     -e "s|{{PHP_VERSION}}|${PHP_VERSION}|g" \
@@ -103,7 +103,7 @@ function configure_caddy() {
   fi
 
   # Save credentials
-  echo -e "phpMyAdmin Credentials:\nURL: https://phpmyadmin.$(hostname)\nUser: ${admin_user}\nPass: ${password}" \
+  echo -e "phpMyAdmin Credentials:\nURL: https://pma.$(hostname)\nUser: ${admin_user}\nPass: ${password}" \
     | sudo tee /root/phpmyadmin_credentials.txt >/dev/null
 
   # Validate and reload

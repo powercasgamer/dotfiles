@@ -1,0 +1,153 @@
+{
+    log {
+        output file /var/log/caddy/global-access.log {
+            roll_size 100mb
+            roll_keep 5
+            roll_keep_for 720h
+        }
+        # Global error log (all sites combined)
+        output file /var/log/caddy/global-error.log {
+            roll_size 50mb
+            roll_keep 5
+            roll_keep_for 720h
+            level ERROR
+        }
+        format json {
+            time_format "2006-01-02T15:04:05Z07:00"
+        }
+    }
+}
+
+# Default security headers and global settings
+(defaults) {
+    header {
+        -Server
+    }
+
+    # TLS configuration
+    tls {
+        protocols tls1.2 tls1.3
+        ciphers TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384 TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384 TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256 TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256 TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256 TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256
+        curves x25519 secp521r1 secp384r1
+        alpn http/1.1 h2
+    }
+
+    # Compression
+    encode zstd gzip
+
+    # Logging
+    log {
+        # Site-specific access log
+        output file /var/log/caddy/{host}-access.log {
+            roll_size 100mb
+            roll_keep 5
+            roll_keep_for 720h
+        }
+
+        # Site-specific error log
+        output file /var/log/caddy/{host}-error.log {
+            roll_size 50mb
+            roll_keep 5
+            roll_keep_for 720h
+            level ERROR
+        }
+    }
+}
+
+(revproxy) {
+    encode zstd gzip
+
+    @http {
+        protocol http
+        not header CF-Connecting-IP *
+    }
+    redir @http https://{host}{uri} permanent
+
+    header {
+        # Trust Cloudflare headers if present
+        X-Real-IP {http.request.header.CF-Connecting-IP|{remote_host}}
+        X-Forwarded-For {http.request.header.CF-Connecting-IP|{remote_host}}
+        X-Forwarded-Proto {scheme}
+        X-Forwarded-Host {host}
+        # Security headers
+        Referrer-Policy "strict-origin-when-cross-origin"
+        X-Content-Type-Options "nosniff"
+        -Server
+    }
+
+    @health path /health
+    handle @health {
+        respond 200
+    }
+
+    reverse_proxy localhost:{args.0} {
+        # Headers to pass to backend
+        header_up X-Real-IP {http.request.header.CF-Connecting-IP|{remote_host}}
+        header_up X-Forwarded-For {http.request.header.CF-Connecting-IP|{remote_host}}
+        header_up X-Forwarded-Proto {scheme}
+        header_up Host {host}
+    }
+}
+
+
+
+        # Example domain configuration
+example.com {
+    import defaults
+
+    # Redirect www to non-www
+    redir https://www.example.com{uri} https://example.com{uri} 301
+
+    # Handle ACME challenges
+    @acme path /.well-known/acme-challenge/*
+    handle @acme {
+        reverse_proxy localhost:9000  # Point to your ACME challenge handler if needed
+    }
+
+    # Main site
+    handle {
+        root * /var/www/example.com
+        file_server {
+            index index.html
+            browse  # Enable directory listing (disable for production)
+        }
+
+        # PHP backend (example)
+        @php path *.php
+        handle @php {
+            reverse_proxy unix//run/php/php8.2-fpm.sock
+        }
+    }
+}
+
+# Reverse proxy example
+api.example.com {
+    import defaults
+
+    handle {
+        reverse_proxy http://localhost:3000 {
+            header_up X-Real-IP {remote_host}
+            header_up Host {host}
+            header_up X-Forwarded-Proto {scheme}
+
+            # Health checks
+            health_uri /health
+            health_interval 30s
+            health_timeout 5s
+        }
+    }
+}
+
+# Static file server with cache
+static.example.com {
+    import defaults
+
+    header Cache-Control "public, max-age=31536000, immutable"
+
+    handle {
+        root * /var/www/static
+        file_server {
+            browse
+        }
+    }
+}

@@ -1,181 +1,266 @@
 #!/usr/bin/env bash
-# Latest Caddy 2 Installer with xcaddy
 set -euo pipefail
 
-# Configuration
-INSTALL_DIR="/usr/local/bin"
-XCADDY_DIR="/opt/xcaddy-build"
+source "${DOTFILES_ROOT}/system/scripts/logging.sh"
 
-# Colorized output
-function info() { echo -e "\033[34m[INFO]\033[0m $*"; }
-function success() { echo -e "\033[32m[✓]\033[0m $*"; }
-function warning() { echo -e "\033[33m[!]\033[0m $*"; }
-function error() { echo -e "\033[31m[✗]\033[0m $*" >&2; exit 1; }
+# Constants
+LOG_FILE="docker-install-$(date +%Y%m%d-%H%M%S).log"
 
-# ==================== LATEST VERSION DETECTION ====================
-function get_latest_go() {
-  curl -s https://go.dev/VERSION?m=text | head -1 | sed 's/go//'
+# Initialize logging
+log_init "$LOG_FILE"
+log_header "Docker Installation Script (Latest Versions)"
+
+# Check if running as root
+if [[ $EUID -ne 0 ]]; then
+    log_error "This script must be run as root"
+    exit 1
+fi
+
+# Function to get latest stable Docker version
+get_latest_docker_version() {
+    curl -fsSL https://download.docker.com/linux/static/stable/x86_64/ | \
+    grep -oP 'docker-\K\d+\.\d+\.\d+(?=\.tgz)' | \
+    sort -V | \
+    tail -1
 }
 
-function get_latest_caddy() {
-  curl -s https://api.github.com/repos/caddyserver/caddy/releases/latest |
-    grep '"tag_name":' |
-    sed -E 's/.*"v([^"]+)".*/\1/'
+# Function to get latest Docker Compose version
+get_latest_compose_version() {
+    curl -fsSL https://api.github.com/repos/docker/compose/releases/latest | \
+    grep -oP '"tag_name": "\Kv\d+\.\d+\.\d+'
 }
 
-# ==================== REQUIREMENTS CHECK ====================
-function check_requirements() {
-  local reqs=("git" "curl" "tar" "jq")
-  local missing=()
+# Detect OS and distribution
+if [ -f /etc/os-release ]; then
+    . /etc/os-release
+    OS=$NAME
+    VER=$VERSION_ID
+elif type lsb_release >/dev/null 2>&1; then
+    OS=$(lsb_release -si)
+    VER=$(lsb_release -sr)
+else
+    OS=$(uname -s)
+    VER=$(uname -r)
+fi
 
-  for cmd in "${reqs[@]}"; do
-    if ! command -v "$cmd" &>/dev/null; then
-      missing+=("$cmd")
+log_info "Detected OS: $OS $VER"
+
+# Installation functions
+install_docker_debian() {
+    log_info "Installing Docker on Debian-based system"
+
+    # Remove old versions
+    log_step "Removing old Docker versions..."
+    apt-get remove -y docker docker-engine docker.io containerd runc || {
+        log_error "Failed to remove old Docker packages"
+        return 1
+    }
+
+    # Install dependencies
+    log_step "Installing dependencies..."
+    apt-get update && apt-get install -y \
+        ca-certificates \
+        curl \
+        gnupg \
+        lsb-release || {
+        log_error "Failed to install dependencies"
+        return 1
+    }
+
+    # Add Docker GPG key
+    log_step "Adding Docker GPG key..."
+    mkdir -p /etc/apt/keyrings
+    curl -fsSL https://download.docker.com/linux/debian/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg || {
+        log_error "Failed to add Docker GPG key"
+        return 1
+    }
+
+    # Set up repository (always use stable channel)
+    log_step "Setting up Docker repository..."
+    echo \
+      "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/debian \
+      $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null || {
+        log_error "Failed to set up Docker repository"
+        return 1
+    }
+
+    # Install Docker (will get latest from repo)
+    log_step "Installing Docker Engine..."
+    apt-get update && apt-get install -y \
+        docker-ce \
+        docker-ce-cli \
+        containerd.io \
+        docker-buildx-plugin \
+        docker-compose-plugin || {
+        log_error "Failed to install Docker packages"
+        return 1
+    }
+
+    return 0
+}
+
+install_docker_rhel() {
+    log_info "Installing Docker on RHEL-based system"
+
+    # Remove old versions
+    log_step "Removing old Docker versions..."
+    yum remove -y docker \
+        docker-client \
+        docker-client-latest \
+        docker-common \
+        docker-latest \
+        docker-latest-logrotate \
+        docker-logrotate \
+        docker-engine || {
+        log_error "Failed to remove old Docker packages"
+        return 1
+    }
+
+    # Install dependencies
+    log_step "Installing dependencies..."
+    yum install -y yum-utils || {
+        log_error "Failed to install dependencies"
+        return 1
+    }
+
+    # Set up repository (always use stable channel)
+    log_step "Setting up Docker repository..."
+    yum-config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo || {
+        log_error "Failed to set up Docker repository"
+        return 1
+    }
+
+    # Install Docker (will get latest from repo)
+    log_step "Installing Docker Engine..."
+    yum install -y docker-ce \
+        docker-ce-cli \
+        containerd.io \
+        docker-buildx-plugin \
+        docker-compose-plugin || {
+        log_error "Failed to install Docker packages"
+        return 1
+    }
+
+    return 0
+}
+
+install_latest_docker_compose() {
+    log_info "Installing latest Docker Compose standalone"
+
+    # Get latest version
+    COMPOSE_VERSION=$(get_latest_compose_version)
+    if [ -z "$COMPOSE_VERSION" ]; then
+        log_error "Failed to get latest Docker Compose version"
+        return 1
     fi
-  done
 
-  if [[ ${#missing[@]} -gt 0 ]]; then
-    warning "Missing dependencies: ${missing[*]}"
-    apt update
-    apt install -y "${missing[@]}"
-    success "Dependencies installed"
-  fi
-}
+    log_info "Latest Docker Compose version: $COMPOSE_VERSION"
 
-# ==================== GO INSTALLATION ====================
-function install_go() {
-  local GO_VERSION=$(get_latest_go)
-  info "Installing latest Go (${GO_VERSION})..."
-
-  if command -v go &>/dev/null; then
-    local installed_ver=$(go version | awk '{print $3}' | sed 's/go//')
-    if [[ "$installed_ver" == "$GO_VERSION" ]]; then
-      info "Go ${GO_VERSION} already installed"
-      return 0
+    # Remove old version if exists
+    if [ -f /usr/local/bin/docker-compose ]; then
+        log_step "Removing old Docker Compose version..."
+        rm -f /usr/local/bin/docker-compose || {
+            log_warning "Failed to remove old Docker Compose"
+        }
     fi
-  fi
 
-  local go_tar="go${GO_VERSION}.linux-amd64.tar.gz"
-  mkdir -p "$XCADDY_DIR"
-  cd "$XCADDY_DIR"
+    # Download binary
+    log_step "Downloading Docker Compose $COMPOSE_VERSION..."
+    curl -SL "https://github.com/docker/compose/releases/download/${COMPOSE_VERSION}/docker-compose-$(uname -s)-$(uname -m)" \
+        -o /usr/local/bin/docker-compose || {
+        log_error "Failed to download Docker Compose"
+        return 1
+    }
 
-  curl -OL "https://golang.org/dl/${go_tar}"
-  rm -rf /usr/local/go
-  tar -C /usr/local -xzf "$go_tar"
+    # Make executable
+    chmod +x /usr/local/bin/docker-compose || {
+        log_error "Failed to make Docker Compose executable"
+        return 1
+    }
 
-  # Add to PATH if not present
-  setup_go_path
+    # Create symlink
+    ln -sf /usr/local/bin/docker-compose /usr/bin/docker-compose || {
+        log_warning "Failed to create symlink for Docker Compose"
+    }
 
-  success "Go ${GO_VERSION} installed"
+    # Verify installation
+    docker-compose --version || {
+        log_error "Docker Compose installation verification failed"
+        return 1
+    }
+
+    return 0
 }
 
-function setup_go_path() {
-  # Add to /etc/profile (Bash)
-  if ! grep -q "/usr/local/go/bin" /etc/profile; then
-    echo 'export PATH=$PATH:/usr/local/go/bin' >> /etc/profile
-  fi
+post_install() {
+    log_info "Running post-installation steps"
 
-  # Add to /etc/zsh/zprofile (Zsh)
-  if [[ -f /etc/zsh/zprofile ]] && ! grep -q "/usr/local/go/bin" /etc/zsh/zprofile; then
-    echo 'export PATH=$PATH:/usr/local/go/bin' >> /etc/zsh/zprofile
-  fi
+    # Start and enable Docker
+    log_step "Starting Docker service..."
+    systemctl start docker || {
+        log_error "Failed to start Docker service"
+        return 1
+    }
 
-  # Apply to current session
-  export PATH=$PATH:/usr/local/go/bin
+    log_step "Enabling Docker service..."
+    systemctl enable docker || {
+        log_error "Failed to enable Docker service"
+        return 1
+    }
+
+    # Test Docker installation
+    log_step "Testing Docker installation..."
+    docker run --rm hello-world && {
+        log_success "Docker installed successfully"
+    } || {
+        log_error "Docker test failed"
+        return 1
+    }
+
+    # Add current user to docker group
+    if [ -n "$SUDO_USER" ]; then
+        log_step "Adding $SUDO_USER to docker group..."
+        usermod -aG docker "$SUDO_USER" || {
+            log_warning "Failed to add user to docker group"
+        }
+        log_info "You'll need to log out and back in for group changes to take effect"
+    fi
+
+    # Show versions
+    log_step "Installed versions:"
+    docker --version
+    docker compose version
+    if [ -f /usr/local/bin/docker-compose ]; then
+        docker-compose --version
+    fi
+
+    return 0
 }
 
-# ==================== XCADDY BUILD ====================
-function build_caddy() {
-  local CADDY_VERSION=$(get_latest_caddy)
-  info "Building latest Caddy (${CADDY_VERSION}) with xcaddy..."
+# Main installation routine
+main() {
+    case $OS in
+        *Debian*|*Ubuntu*|*Pop!_OS*|*Linux\ Mint*)
+            install_docker_debian || exit 1
+            ;;
+        *CentOS*|*Red\ Hat*|*Fedora*|*Rocky*|*AlmaLinux*)
+            install_docker_rhel || exit 1
+            ;;
+        *)
+            log_error "Unsupported OS: $OS"
+            exit 1
+            ;;
+    esac
 
-  export GOPATH="$XCADDY_DIR/go"
-  export GOBIN="$GOPATH/bin"
-  mkdir -p "$GOPATH"
+    # Install standalone Docker Compose (in addition to the plugin)
+    install_latest_docker_compose || {
+        log_warning "Standalone Docker Compose installation failed, but Docker Compose plugin may still work"
+    }
 
-  # Install latest xcaddy
-  go install github.com/caddyserver/xcaddy/cmd/xcaddy@latest
+    post_install || exit 1
 
-  # Build Caddy with common plugins
-  local plugins=(
-    "github.com/caddy-dns/cloudflare"
-    "github.com/enum-gg/caddy-discord"
-#    "github.com/caddyserver/forwardproxy@latest"
-#    "github.com/greenpau/caddy-security@latest"
-  )
-
-  local build_cmd=("$GOBIN/xcaddy" build "v${CADDY_VERSION}")
-  for plugin in "${plugins[@]}"; do
-    build_cmd+=("--with" "$plugin")
-  done
-
-  if ! "${build_cmd[@]}"; then
-    error "Failed to build Caddy"
-  fi
-
-  # Install to system
-  mv caddy "$INSTALL_DIR"
-  setcap 'cap_net_bind_service=+ep' "$INSTALL_DIR/caddy"
-
-  success "Caddy ${CADDY_VERSION} built with plugins"
+    log_success "Installation completed successfully"
+    log_info "Installation log saved to $LOG_FILE"
 }
 
-# ==================== SYSTEMD SERVICE ====================
-function configure_service() {
-  info "Configuring Caddy systemd service..."
-
-  cat <<EOF | tee /etc/systemd/system/caddy.service >/dev/null
-[Unit]
-Description=Caddy 2
-Documentation=https://caddyserver.com/docs/
-After=network.target
-
-[Service]
-User=caddy
-Group=caddy
-ExecStart=$INSTALL_DIR/caddy run --environ --config /etc/caddy/Caddyfile
-ExecReload=$INSTALL_DIR/caddy reload --config /etc/caddy/Caddyfile
-TimeoutStopSec=5s
-LimitNOFILE=1048576
-LimitNPROC=512
-PrivateTmp=true
-ProtectSystem=full
-AmbientCapabilities=CAP_NET_BIND_SERVICE
-
-[Install]
-WantedBy=multi-user.target
-EOF
-
-  # Create user and directories
-  if ! id caddy &>/dev/null; then
-    useradd --system --shell /usr/sbin/nologin --home-dir /etc/caddy caddy
-  fi
-
-  mkdir -p /etc/caddy
-  chown -R caddy:caddy /etc/caddy
-
-  systemctl daemon-reload
-  systemctl enable --now caddy
-
-  success "Caddy service configured"
-}
-
-# ==================== MAIN ====================
-function main() {
-  check_requirements
-  install_go
-  build_caddy
-  configure_service
-
-  success "Installation complete!"
-  echo -e "\nVersions:"
-  go version
-  /usr/local/bin/caddy version
-
-  echo -e "\nNext steps:"
-  echo "1. Edit config: /etc/caddy/Caddyfile"
-  echo "2. Check status: systemctl status caddy"
-  echo "3. Test: curl -I http://localhost"
-}
-
-main "$@"
+main

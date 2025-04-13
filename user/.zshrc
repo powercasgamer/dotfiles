@@ -64,50 +64,6 @@ if [[ -f ~/.p10k.zsh ]]; then
   source ~/.p10k.zsh
 fi
 
-# ===== ZSH Topic Loader =====
-load_zsh_topics() {
-  local zsh_topics_dir="$DOTFILES_DIR/zsh/topics"
-  
-  # Initialize base fpath
-  fpath=(
-    ~/.zsh/completions
-    ${ZDOTDIR:-~}/.zinit/completions(N/)
-    ${fpath}
-  )
-
-  [[ -d "$zsh_topics_dir" ]] || return
-
-  echo "📦 Loading ZSH topics..."
-  for topic_dir in "$zsh_topics_dir"/*(N/); do
-    [[ -f "$topic_dir/.disabled" ]] && continue
-
-    # 1. First: Source completions.zsh if exists
-    [[ -f "$topic_dir/completions.zsh" ]] && {
-      echo "⌙ [Completions] ${topic_dir##*/}"
-      source "$topic_dir/completions.zsh"
-    }
-
-    # 2. Then: Load other .zsh files
-    for zsh_file in "$topic_dir"/*.zsh(N); do
-      [[ "$zsh_file" == */completions.zsh ]] && continue
-      source "$zsh_file"
-    done
-
-    # 3. Thirdly: Run install.sh.sh if exists
-    [[ -f "$topic_dir/install.sh" ]] && {
-      echo "⚙️ Installing ${topic_dir##*/}"
-      (cd "$topic_dir" && bash install.sh)
-    }
-  done
-
-  # Initialize completions once after all topics are loaded
-  autoload -Uz compinit
-  compinit -i -d "${ZSH_COMPDUMP:-${ZDOTDIR:-$HOME}/.zcompdump}"
-}
-
-# Run on new shells
-[[ -z "$ZSH_FAST_LOAD" ]] && load_zsh_topics
-
 # Stash your environment variables in ~/.localrc. This means they'll stay out
 # of your main dotfiles repository (which may be public, like this one), but
 # you'll have access to them in your scripts.

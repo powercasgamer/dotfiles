@@ -1,22 +1,23 @@
 # Secure phpMyAdmin Configuration
-phpmyadmin.{{hostname}} {
-  root * {{webroot}}/phpmyadmin
+pma.{{hostname}} {
+  root * {{webroot}}
   file_server {
     hide /vendor/*
     hide /config/*
     hide /tmp/*
   }
 
-  php_fastcgi unix//run/php/php{{PHP_VERSION}}-fpm.sock {
-    env SCRIPT_FILENAME {root}/index.php
-    env PHP_ADMIN_VALUE "open_basedir={{webroot}}/phpmyadmin:/usr/share/php:/tmp"
-    env PHP_VALUE "expose_php=Off"
-  }
+  php_fastcgi unix//run/php/php{{PHP_VERSION}}-fpm.sock
+
+  respond /robots.txt "User-agent: *\nDisallow: /\n" 200
 
   header {
     Content-Security-Policy "default-src 'self'"
     X-Frame-Options "DENY"
     -Server
+    X-Robots-Tag "noindex, nofollow, noarchive"
+    Permissions-Policy "interest-cohort=()"
+
   }
 
   basicauth /* {
