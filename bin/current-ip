@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+# current-ip - Prints your current public IP address
+
+# Try multiple IP services in case one is down
+IP_SERVICES=(
+    "https://ipinfo.io/ip"
+    "https://ifconfig.me/ip"
+    "https://api.ipify.org"
+    "https://icanhazip.com"
+)
+
+# Try each service until we get a response
+for service in "${IP_SERVICES[@]}"; do
+    if ip=$(curl -s --connect-timeout 3 "$service"); then
+        if [[ "$ip" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "$ip"
+            exit 0
+        fi
+    fi
+done
+
+echo "Error: Could not determine public IP address" >&2
+exit 1

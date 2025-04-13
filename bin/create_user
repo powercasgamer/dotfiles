@@ -1,10 +1,11 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Global variables
 readonly LOG_FILE="/var/log/user_creation.log"
 readonly ALLOWED_KEYS="/home/dotfiles/allowed_keys"
 readonly MAX_USERNAME_LENGTH=32
 readonly DEFAULT_SHELL="/bin/zsh"
+readonly TEMP_KEY_FILE="/tmp/github_keys_$RANDOM"
 
 # Function to log messages
 log_message() {
@@ -41,19 +42,86 @@ validate_username() {
     return 0
 }
 
+# Import SSH keys from GitHub
+import_github_keys() {
+    local github_username="$1"
+    local api_url="https://api.github.com/users/$github_username/keys"
+
+    log_message "Attempting to fetch SSH keys from GitHub for user: $github_username"
+
+    if ! command -v curl >/dev/null 2>&1; then
+        log_message "Error: curl is required but not installed."
+        return 1
+    fi
+
+    # Fetch keys from GitHub API
+    response=$(curl -s "$api_url")
+
+    if [[ "$response" == *"Not Found"* ]]; then
+        log_message "Error: GitHub user '$github_username' not found."
+        return 1
+    fi
+
+    if ! echo "$response" | jq -r '.[].key' > "$TEMP_KEY_FILE" 2>/dev/null; then
+        log_message "Error: Failed to parse GitHub API response. jq may not be installed."
+        return 1
+    fi
+
+    if [ ! -s "$TEMP_KEY_FILE" ]; then
+        log_message "Error: No SSH keys found for GitHub user '$github_username'."
+        return 1
+    fi
+
+    log_message "Successfully fetched $(wc -l < "$TEMP_KEY_FILE") SSH keys from GitHub"
+    return 0
+}
+
 # Setup SSH for user
 setup_ssh() {
     local username="$1"
     local user_home="/home/$username"
     local user_ssh_dir="$user_home/.ssh"
+    local key_source="$2"
 
     mkdir -p "$user_ssh_dir" || return 1
-    cp "$ALLOWED_KEYS" "$user_ssh_dir/authorized_keys" || return 1
+
+    case "$key_source" in
+        "github")
+            if ! import_github_keys "$3"; then
+                return 1
+            fi
+            cat "$TEMP_KEY_FILE" >> "$user_ssh_dir/authorized_keys"
+            rm -f "$TEMP_KEY_FILE"
+            ;;
+        "local")
+            if [ ! -f "$ALLOWED_KEYS" ]; then
+                log_message "Error: SSH keys file not found at $ALLOWED_KEYS."
+                return 1
+            fi
+            cp "$ALLOWED_KEYS" "$user_ssh_dir/authorized_keys" || return 1
+            ;;
+        *)
+            log_message "Error: Invalid SSH key source specified."
+            return 1
+            ;;
+    esac
+
     chown -R "$username:$username" "$user_ssh_dir" || return 1
     chmod 700 "$user_ssh_dir" || return 1
     chmod 600 "$user_ssh_dir/authorized_keys" || return 1
 
     return 0
+}
+
+# Show usage information
+show_usage() {
+    echo "Usage: $0 [username] [--github GITHUB_USERNAME]"
+    echo
+    echo "Options:"
+    echo "  username              The username to create (will prompt if not provided)"
+    echo "  --github USERNAME     Import SSH keys from GitHub user's account"
+    echo
+    exit 1
 }
 
 # Main function
@@ -66,18 +134,45 @@ main() {
     check_zsh_installed  # Verify zsh is installed before proceeding
 
     local username
-    if [ -z "$1" ]; then
+    local github_user=""
+    local key_source="local"
+
+    # Parse arguments
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --github)
+                if [ -z "$2" ]; then
+                    log_message "Error: --github requires a GitHub username."
+                    show_usage
+                fi
+                github_user="$2"
+                key_source="github"
+                shift 2
+                ;;
+            --help|-h)
+                show_usage
+                ;;
+            -*)
+                log_message "Error: Unknown option $1"
+                show_usage
+                ;;
+            *)
+                if [ -z "$username" ]; then
+                    username="$1"
+                    shift
+                else
+                    log_message "Error: Too many arguments."
+                    show_usage
+                fi
+                ;;
+        esac
+    done
+
+    if [ -z "$username" ]; then
         read -rp "Enter the new username: " username
-    else
-        username="$1"
     fi
 
     if ! validate_username "$username"; then
-        exit 1
-    fi
-
-    if [ ! -f "$ALLOWED_KEYS" ]; then
-        log_message "Error: SSH keys file not found at $ALLOWED_KEYS."
         exit 1
     fi
 
@@ -92,13 +187,16 @@ main() {
         exit 1
     fi
 
-    if ! setup_ssh "$username"; then
+    if ! setup_ssh "$username" "$key_source" "$github_user"; then
         log_message "Error: SSH setup failed for '$username'."
         exit 1
     fi
 
-    log_message "Success: User '$username' created with zsh, sudo access, and SSH keys."
-    echo "✅ User '$username' created successfully."
+    log_message "Success: User '$username' created with zsh, sudo access, and SSH keys (source: $key_source)."
+    echo "✅ User '$username' created successfully with:"
+    echo "   - Default shell: $DEFAULT_SHELL"
+    echo "   - Sudo privileges"
+    echo "   - SSH keys imported from: ${key_source}${github_user:+ ($github_user)}"
 }
 
 main "$@"

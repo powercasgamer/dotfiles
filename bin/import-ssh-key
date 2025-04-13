@@ -1,0 +1,186 @@
+#!/usr/bin/env bash
+
+# Global variables
+readonly LOG_FILE="/var/log/github_keys_import.log"
+readonly TEMP_KEY_FILE="/tmp/github_keys_$RANDOM"
+
+# Function to log messages
+log_message() {
+    echo "$(date '+%Y-%m-%d %H:%M:%S') : $1" | tee -a "$LOG_FILE"
+}
+
+# Function to clean up temporary files
+cleanup() {
+    rm -f "$TEMP_KEY_FILE"
+    log_message "Cleaned up temporary files"
+}
+
+# Function to import keys from GitHub
+import_github_keys() {
+    local github_username="$1"
+    local target_user="$2"
+    local ssh_dir="/home/$target_user/.ssh"
+    local authorized_keys="$ssh_dir/authorized_keys"
+    local api_url="https://api.github.com/users/$github_username/keys"
+
+    log_message "Starting SSH key import for GitHub user: $github_username → System user: $target_user"
+
+    # Check if running as root when modifying other users
+    if [ "$target_user" != "$(whoami)" ] && [ "$(id -u)" -ne 0 ]; then
+        log_message "Error: Root privileges required to modify other users' SSH keys"
+        return 1
+    fi
+
+    # Check for required commands
+    if ! command -v curl >/dev/null 2>&1; then
+        log_message "Error: curl is required but not installed"
+        return 1
+    fi
+
+    if ! command -v jq >/dev/null 2>&1; then
+        log_message "Error: jq is required but not installed"
+        return 1
+    fi
+
+    # Create .ssh directory if it doesn't exist
+    if [ ! -d "$ssh_dir" ]; then
+        log_message "Creating SSH directory: $ssh_dir"
+        mkdir -p "$ssh_dir" || {
+            log_message "Error: Failed to create SSH directory"
+            return 1
+        }
+        chown "$target_user:$target_user" "$ssh_dir"
+        chmod 700 "$ssh_dir"
+    fi
+
+    # Fetch keys from GitHub API
+    log_message "Fetching keys from GitHub API..."
+    response=$(curl -s "$api_url")
+
+    if [[ "$response" == *"Not Found"* ]]; then
+        log_message "Error: GitHub user '$github_username' not found"
+        return 1
+    fi
+
+    if ! echo "$response" | jq -r '.[].key' > "$TEMP_KEY_FILE"; then
+        log_message "Error: Failed to parse GitHub API response"
+        return 1
+    fi
+
+    if [ ! -s "$TEMP_KEY_FILE" ]; then
+        log_message "Error: No SSH keys found for GitHub user '$github_username'"
+        return 1
+    fi
+
+    key_count=$(wc -l < "$TEMP_KEY_FILE")
+    log_message "Found $key_count SSH keys for GitHub user $github_username"
+
+    # Backup existing authorized_keys if it exists
+    if [ -f "$authorized_keys" ]; then
+        backup_file="$authorized_keys.bak-$(date +%Y%m%d%H%M%S)"
+        log_message "Backing up existing authorized_keys to $backup_file"
+        cp "$authorized_keys" "$backup_file" || {
+            log_message "Error: Failed to backup existing authorized_keys"
+            return 1
+        }
+    fi
+
+    # Add new keys
+    log_message "Adding new keys to authorized_keys"
+    {
+        echo "# GitHub keys for $github_username - imported $(date '+%Y-%m-%d %H:%M:%S')"
+        cat "$TEMP_KEY_FILE"
+        if [ -f "$authorized_keys" ]; then
+            echo "" # Add blank line between new and existing keys
+            grep -v "^#" "$authorized_keys" | grep -v "^$" # Add existing keys (excluding comments/empty lines)
+        fi
+    } > "$authorized_keys.tmp" && mv "$authorized_keys.tmp" "$authorized_keys"
+
+    # Set proper permissions
+    chown "$target_user:$target_user" "$authorized_keys"
+    chmod 600 "$authorized_keys"
+
+    log_message "Successfully imported $key_count keys from GitHub to $target_user's authorized_keys"
+    return 0
+}
+
+# Show usage information
+show_usage() {
+    echo "Usage: $0 [OPTIONS] GITHUB_USERNAME"
+    echo
+    echo "Import SSH keys from a GitHub user to your system"
+    echo
+    echo "Options:"
+    echo "  -u, --user USERNAME    Specify target system user (default: current user)"
+    echo "  -h, --help             Show this help message"
+    echo
+    echo "Examples:"
+    echo "  $0 octocat              # Import to current user"
+    echo "  $0 -u deploy octocat    # Import to 'deploy' user"
+    echo "  sudo $0 -u root octocat # Import to root (requires sudo)"
+    exit 0
+}
+
+# Main function
+main() {
+    trap cleanup EXIT
+
+    local github_user=""
+    local target_user="$(whoami)"
+
+    # Parse arguments
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            -u|--user)
+                if [ -z "$2" ]; then
+                    log_message "Error: --user requires a username"
+                    show_usage
+                    exit 1
+                fi
+                target_user="$2"
+                shift 2
+                ;;
+            -h|--help)
+                show_usage
+                ;;
+            -*)
+                log_message "Error: Unknown option $1"
+                show_usage
+                exit 1
+                ;;
+            *)
+                if [ -z "$github_user" ]; then
+                    github_user="$1"
+                    shift
+                else
+                    log_message "Error: Too many arguments"
+                    show_usage
+                    exit 1
+                fi
+                ;;
+        esac
+    done
+
+    if [ -z "$github_user" ]; then
+        log_message "Error: GitHub username is required"
+        show_usage
+        exit 1
+    fi
+
+    # Verify target user exists
+    if ! id -u "$target_user" >/dev/null 2>&1; then
+        log_message "Error: Target user '$target_user' does not exist"
+        exit 1
+    fi
+
+    if import_github_keys "$github_user" "$target_user"; then
+        echo "✅ Successfully imported SSH keys from GitHub user '$github_user' to '$target_user'"
+        echo "   Total keys imported: $(wc -l < "$TEMP_KEY_FILE")"
+        echo "   Log file: $LOG_FILE"
+    else
+        echo "❌ Failed to import SSH keys"
+        exit 1
+    fi
+}
+
+main "$@"

@@ -9,11 +9,40 @@ mkdir -p "$IP_LISTS_DIR"
 
 # IP List URLs
 CLOUDFLARE_IPS_URL="https://www.cloudflare.com/ips-v4"
-TCPSHIELD_IPS_URL="https://tcpshield.com/v4"
+TCPSHIELD_IPS_URL="https://tcpshield.com/v4/"
 
 # Network Interfaces
 PELICAN_IFACE="pelican0"  # Adjust based on your setup
-DATABASE_NETWORK="10.0.0.0/24"  # Example database network
+
+function parse_ports() {
+    local input_str="$1"
+    local ports=()
+
+    # Handle space-separated ports and ranges
+    for item in $input_str; do
+        # Check for range syntax (25565-25570 or 25565:25570)
+        if [[ "$item" =~ ^([0-9]+)[:-]([0-9]+)$ ]]; then
+            local start_port="${BASH_REMATCH[1]}"
+            local end_port="${BASH_REMATCH[2]}"
+
+            if (( start_port < end_port && end_port <= 65535 )); then
+                for (( port=start_port; port<=end_port; port++ )); do
+                    ports+=("$port")
+                done
+            else
+                echo "⚠️ Invalid range: $item (start must be < end and end <= 65535)"
+            fi
+        elif [[ "$item" =~ ^[0-9]+$ && "$item" -le 65535 ]]; then
+            ports+=("$item")
+        else
+            echo "⚠️ Invalid port or range: $item (must be 0-65535)"
+        fi
+    done
+
+    # Remove duplicates and sort
+    ports=($(printf "%s\n" "${ports[@]}" | sort -nu))
+    echo "${ports[@]}"
+}
 
 function setup_cloudflare() {
     echo "🌩️ Configuring Cloudflare firewall rules"
@@ -22,7 +51,13 @@ function setup_cloudflare() {
     curl -s "$CLOUDFLARE_IPS_URL" -o "$IP_LISTS_DIR/cloudflare_ips.txt"
 
     # Get ports from user
-    read -p "Enter ports to open for Cloudflare (space-separated): " -a PORTS
+    read -p "Enter ports to open for Cloudflare (space-separated, can use ranges like 25565-25570): " port_input
+    PORTS=($(parse_ports "$port_input"))
+
+    if [ ${#PORTS[@]} -eq 0 ]; then
+        echo "❌ No valid ports provided"
+        return
+    fi
 
     # Allow Cloudflare IPs to specified ports
     while read -r ip; do
@@ -41,7 +76,13 @@ function setup_tcpshield() {
     curl -s "$TCPSHIELD_IPS_URL" -o "$IP_LISTS_DIR/tcpshield_ips.txt"
 
     # Get ports from user
-    read -p "Enter ports to open for TCPShield (space-separated): " -a PORTS
+    read -p "Enter ports to open for TCPShield (space-separated, can use ranges like 25565-25570): " port_input
+    PORTS=($(parse_ports "$port_input"))
+
+    if [ ${#PORTS[@]} -eq 0 ]; then
+        echo "❌ No valid ports provided"
+        return
+    fi
 
     # Allow TCPShield IPs to specified ports
     while read -r ip; do
@@ -73,30 +114,35 @@ function setup_pelican() {
 
     # Default database ports
     echo "🔹 Applying default database rules for Pelican network..."
-    sudo ufw allow in on pelican0 to 172.18.0.1 port 3306 proto tcp comment "Pelican MySQL"
-    sudo ufw allow in on pelican0 to 172.18.0.1 port 5432 proto tcp comment "Pelican PostgreSQL"
-    sudo ufw allow in on pelican0 to 172.18.0.1 port 6379 proto tcp comment "Pelican Redis"
-    sudo ufw allow in on pelican0 to 172.18.0.1 port 27017 proto tcp comment "Pelican MongoDB"
+    sudo ufw allow in on $PELICAN_IFACE to 172.18.0.1 port 3306 proto tcp comment "Pelican MySQL"
+    sudo ufw allow in on $PELICAN_IFACE to 172.18.0.1 port 5432 proto tcp comment "Pelican PostgreSQL"
+    sudo ufw allow in on $PELICAN_IFACE to 172.18.0.1 port 6379 proto tcp comment "Pelican Redis"
+    sudo ufw allow in on $PELICAN_IFACE to 172.18.0.1 port 27017 proto tcp comment "Pelican MongoDB"
 
     # Optional additional ports
     read -p "Would you like to whitelist additional ports to 172.18.0.1? [y/N] " add_ports
     if [[ "$add_ports" =~ ^[Yy]$ ]]; then
         while true; do
-            read -p "Enter port to whitelist (or 'done' to finish): " port
-            [[ "$port" == "done" ]] && break
+            read -p "Enter port(s) to whitelist (can be single, space-separated, or range like 25565-25570): " port_input
+            [[ "$port_input" == "done" ]] && break
 
-            if [[ "$port" =~ ^[0-9]+$ ]]; then
-                sudo ufw allow in on pelican0 to 172.18.0.1 port "$port" proto tcp comment "Pelican Custom Port"
-                echo "✅ Whitelisted port $port on pelican0 → 172.18.0.1"
-            else
-                echo "❌ Invalid port number"
+            PORTS=($(parse_ports "$port_input"))
+
+            if [ ${#PORTS[@]} -eq 0 ]; then
+                echo "❌ No valid ports provided"
+                continue
             fi
+
+            for port in "${PORTS[@]}"; do
+                sudo ufw allow in on $PELICAN_IFACE to 172.18.0.1 port "$port" proto tcp comment "Pelican Custom Port"
+                echo "✅ Whitelisted port $port on $PELICAN_IFACE → 172.18.0.1"
+            done
         done
     fi
 
     echo "✅ Pelican firewall configuration complete"
-    echo "   Summary of rules for pelican0:"
-    sudo ufw status | grep pelican0
+    echo "   Summary of rules for $PELICAN_IFACE:"
+    sudo ufw status | grep $PELICAN_IFACE
 }
 
 function show_menu() {

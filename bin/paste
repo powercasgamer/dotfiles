@@ -1,8 +1,17 @@
 #!/usr/bin/env zsh
 
-paste() {
-  emulate -L zsh  # Ensure Zsh emulation mode
+function paste() {
+  emulate -L zsh
   setopt extendedglob localoptions
+
+  # Force load colors (works in both interactive and non-interactive shells)
+  autoload -Uz colors && colors
+
+  # Show help if no arguments
+  if [[ $# -eq 0 ]]; then
+    echo "${fg[red]}Usage:${reset_color} paste <file> [language]"
+    return 1
+  fi
 
   local file="$1"
   local lang="${2:-}"
@@ -11,15 +20,15 @@ paste() {
 
   # Validate file exists and is readable
   if [[ ! -f "$file" ]] || [[ ! -r "$file" ]]; then
-    echo >&2 "%F{red}Error:%f Cannot access file: %F{yellow}${file}%f"
+    echo "${fg[red]}Error:${reset_color} Cannot access file: ${fg[yellow]}${file}${reset_color}" >&2
     return 1
   fi
 
-  # Extract filename and extension (Zsh-specific parameter expansion)
+  # Extract filename and extension
   filename=${file:t}
-  extension=${file:e:l}  # :e for extension, :l for lowercase
+  extension=${file:e:l}
 
-  # Language to content-type mapping (strict text/<language> format)
+  # Language to content-type mapping
   local -A lang_map=(
     log      log
     sh      shell
@@ -30,7 +39,7 @@ paste() {
     py      python
     java    java
     kt      kotlin
-    kts      kotlin
+    kts     kotlin
     go      go
     rs      rust
     rb      ruby
@@ -56,18 +65,18 @@ paste() {
   fi
   content_type="text/$lang"
 
-  # Upload with progress using Zsh colors
-  echo "%F{blue}Uploading%f %F{yellow}${filename}%f (%F{green}${content_type}%f)..." >&2
+  # Colored upload message
+  echo "${fg[blue]}Uploading${reset_color} ${fg[yellow]}${filename}${reset_color} (${fg[green]}${content_type}${reset_color})..." >&2
 
-  # Execute curl with proper error handling
+  # Execute curl (without -s flag to see errors)
   local response
-  response=$(curl -sSf -T "$file" -H "Content-Type: $content_type" \
+  response=$(curl -f -T "$file" -H "Content-Type: $content_type" \
     https://api.pastes.dev/post 2>&1)
 
   local ret=$?
   if [[ $ret -ne 0 ]]; then
-    echo "%F{red}Error%f ($ret): Failed to upload file" >&2
-    [[ -n "$response" ]] && echo "$response" >&2
+    echo "${fg[red]}Error${reset_color} ($ret): Failed to upload file" >&2
+    echo "$response" >&2
     return $ret
   fi
 
@@ -80,8 +89,8 @@ paste() {
   fi
 
   if [[ -n "$url" ]]; then
-    echo "%F{green}Success!%f Paste URL: %F{cyan}${url}%f"
-    # Try to copy to clipboard (macOS/Linux)
+    echo "${fg[green]}Success!${reset_color} Paste URL: ${fg[cyan]}${url}${reset_color}"
+    # Copy to clipboard
     if command -v pbcopy &>/dev/null; then
       echo -n "$url" | pbcopy && echo "(URL copied to clipboard)"
     elif command -v xclip &>/dev/null; then
@@ -91,3 +100,8 @@ paste() {
     echo "$response"
   fi
 }
+
+# Only run if executed directly (not sourced)
+if [[ "${(%):-%N}" == "paste" ]]; then
+  paste "$@"
+fi
