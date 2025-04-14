@@ -86,7 +86,7 @@ function paste() {
   fi
 
   # Extract and print just the URL
-  local url = $response
+  local url=$response
 
     # Copy to clipboard if possible
     if command -v pbcopy &>/dev/null; then
