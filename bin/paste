@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # File upload utility using paste.dev API
-# Requires: curl, jq (optional)
+# Requires: curl
 
 # Load logging utilities
 DOTFILES_ROOT="/usr/local/share/dotfiles-system"
@@ -75,7 +75,7 @@ function paste() {
 
   # Execute curl
   local response
-  response=$(curl -f -T "$file" -H "Content-Type: $content_type" \
+  response=$(curl -fsS -T "$file" -H "Content-Type: $content_type" \
     https://api.pastes.dev/post 2>&1)
 
   local ret=$?
@@ -85,7 +85,7 @@ function paste() {
     return $ret
   fi
 
-  # Process response
+  # Extract and print just the URL
   local url
   if command -v jq &>/dev/null; then
     url=$(echo "$response" | jq -r '.url // empty' 2>/dev/null)
@@ -94,26 +94,23 @@ function paste() {
   fi
 
   if [[ -n "$url" ]]; then
-    success "Paste created successfully"
-    info "URL: ${url}"
+    echo "$url"
 
-    # Copy to clipboard
+    # Copy to clipboard if possible
     if command -v pbcopy &>/dev/null; then
-      echo -n "$url" | pbcopy && info "URL copied to clipboard (macOS)"
+      echo -n "$url" | pbcopy
     elif command -v xclip &>/dev/null; then
-      echo -n "$url" | xclip -selection clipboard && info "URL copied to clipboard (Linux)"
+      echo -n "$url" | xclip -selection clipboard
     elif command -v wl-copy &>/dev/null; then
-      echo -n "$url" | wl-copy && info "URL copied to clipboard (Wayland)"
+      echo -n "$url" | wl-copy
     fi
   else
     error "Failed to parse response"
     info "Raw response: ${response}"
+    return 1
   fi
 }
 
-# Only run if executed directly (not sourced)
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
-  # Set default logging level to INFO
-  export LOG_LEVEL="INFO"
   paste "$@"
 fi
