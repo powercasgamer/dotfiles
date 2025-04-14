@@ -23,6 +23,8 @@ function install_essential() {
     tar
     htop
     jq
+    fonts-powerline
+    ripgrep
   )
 
   # Distro-specific packages

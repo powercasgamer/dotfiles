@@ -1,0 +1,3 @@
+
+[[ -d "$HOME/bin" ]] && export PATH="$HOME/bin:$PATH"
+[[ -f ~/.zshrc.local ]] && source ~/.zshrc.local

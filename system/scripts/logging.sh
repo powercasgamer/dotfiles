@@ -21,6 +21,10 @@ function warning() {
   echo -e "${YELLOW}[!]${NC} $*" >&2
 }
 
+function step() {
+  echo -e "${BLUE}[STEP]${NC} $*"
+}
+
 function error() {
   echo -e "${RED}[✗]${NC} $*" >&2
   exit 1
@@ -33,7 +37,6 @@ function confirm() {
   read -r ans
   [[ "$ans" =~ ^[Yy]([Ee][Ss])?$ ]]
 }
-
 
 log_init() {
     LOG_FILE=${1:-"script-$(date +%Y%m%d-%H%M%S).log"}

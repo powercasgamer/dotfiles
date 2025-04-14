@@ -1,87 +1,91 @@
 #!/usr/bin/env zsh
+# ===== MAIN ZSH CONFIGURATION =====
+# Optimized for speed, readability, and extensibility.
 
-# Enable Powerlevel10k instant prompt (must be at the top of ~/.zshrc)
-if [[ -r "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh" ]]; then
-  source "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh"
-fi
+# --- Oh My Zsh Setup ---
+# Set Oh My Zsh installation path
+export ZSH="${HOME}/.oh-my-zsh"
 
-# Initialize Zinit plugin manager
-ZINIT_HOME="${XDG_DATA_HOME:-${HOME}/.local/share}/zinit/zinit.git"
-if [ ! -d "$ZINIT_HOME" ]; then
-  mkdir -p "$(dirname "$ZINIT_HOME")"
-  git clone https://github.com/zdharma-continuum/zinit.git "$ZINIT_HOME"
-fi
-source "${ZINIT_HOME}/zinit.zsh"
+# Theme (agnoster is popular but can be slow; alternatives: powerlevel10k, starship)
+ZSH_THEME="agnoster"
 
-autoload -Uz _zinit
-(( ${+_comps} )) && _comps[zinit]=_zinit
+# Disable magic functions if experiencing paste issues (uncomment if needed)
+# DISABLE_MAGIC_FUNCTIONS="true"
 
-# Fix history settings (MUST come before plugins)
-HISTFILE=~/.zsh_history
-HISTSIZE=100000
-SAVEHIST=100000
-setopt EXTENDED_HISTORY    # Save timestamps
-setopt SHARE_HISTORY      # Share history across sessions
-setopt HIST_IGNORE_SPACE  # Don't save commands starting with space
+# --- Plugins ---
+# Note: Order matters! Syntax highlighting should be last.
+plugins=(
+  git               # Git aliases and shortcuts
+  zsh-autosuggestions # Fish-like suggestions (install via OMZ or manual)
+  zsh-syntax-highlighting  # Command syntax coloring (must be last!)
+)
 
-# Load history-substring-search with GUARANTEED key bindings
-zinit ice atload"
-    bindkey '^[[A' history-substring-search-up;
-    bindkey '^[[B' history-substring-search-down;
-    bindkey '^[OA' history-substring-search-up;
-    bindkey '^[OB' history-substring-search-down
-"
-zinit light zsh-users/zsh-history-substring-search
+# Load Oh My Zsh
+source "${ZSH}/oh-my-zsh.sh"
 
-# Load Plugins
-zinit light zsh-users/zsh-autosuggestions
-
-zinit light zsh-users/zsh-syntax-highlighting
-zinit light zsh-users/zsh-completions
-
-# Initialize completions
+# ===== PERFORMANCE & CORE SETTINGS =====
+# Speed up completions (disable if encountering issues)
+zstyle ':completion:*' cache-path "${HOME}/.zsh_cache"
 autoload -Uz compinit && compinit
 
-# Load Snippets
-zinit snippet OMZL::clipboard.zsh     # Clipboard integration
-zinit snippet OMZL::termsupport.zsh   # Terminal window/tab title support
+# History settings (larger history, ignore duplicates)
+HISTFILE="${HOME}/.zsh_history"
+HISTSIZE=100000
+SAVEHIST=100000
+setopt HIST_IGNORE_ALL_DUPS  # Skip duplicates
+setopt HIST_SAVE_NO_DUPS     # Don't save duplicates
+setopt INC_APPEND_HISTORY    # Append history immediately
 
-# Load Powerlevel10k theme
-zinit ice depth"1"  # Shallow clone for faster install.sh.sh
-zinit light romkatv/powerlevel10k
-
-# Configure LS_COLORS (better `ls` colors)
-zinit ice as"program" \
-    atclone"dircolors -b LS_COLORS >! clrs.zsh" \
-    atpull"%atclone" \
-    pick"clrs.zsh" \
-    nocompile'!' \
-    atload'zstyle ":completion:*" list-colors "${(s.:.)LS_COLORS}"'
-zinit light trapd00r/LS_COLORS
-
-# Load Powerlevel10k config (run `p10k configure` to customize)
-if [[ -f ~/.p10k.zsh ]]; then
-  source ~/.p10k.zsh
+# ===== TERMINAL ENHANCEMENTS =====
+# --- Colors & Aliases ---
+# Enable colors in terminal commands
+if [[ -x "$(command -v dircolors)" ]]; then
+  [[ -r "${HOME}/.dircolors" ]] \
+    && eval "$(dircolors -b "${HOME}/.dircolors")" \
+    || eval "$(dircolors -b)"
+  # Colorize common commands
+  alias ls='ls --color=auto'
+  alias grep='grep --color=auto'
+  alias fgrep='fgrep --color=auto'
+  alias egrep='egrep --color=auto'
+  alias diff='diff --color=auto'
 fi
 
-# Stash your environment variables in ~/.localrc. This means they'll stay out
-# of your main dotfiles repository (which may be public, like this one), but
-# you'll have access to them in your scripts.
-if [[ -a ~/.localrc ]]
-then
-  source ~/.localrc
-fi
+# Custom LS_COLORS (e.g., highlight other-writable dirs)
+export LS_COLORS="${LS_COLORS}:ow=1;34;42"
 
-# Aliases etc
-# Source all .zsh files in directory
-if [[ -d ~/zsh/includes ]]; then
-    for file in ~/zsh/includes/*.zsh; do
-        [[ -f $file ]] && source $file
-    done
-fi
-export LS_COLORS="$LS_COLORS:ow=1;34;42"
+# --- Key Bindings ---
+# Better history navigation (requires zsh-history-substring-search plugin)
+# bindkey '^[[A' history-substring-search-up
+# bindkey '^[[B' history-substring-search-down
+# bindkey '^[OA' history-substring-search-up
+# bindkey '^[OB' history-substring-search-down
 
-export PATH="$HOME/bin:$PATH"
+# Fix Home/End keys (for most terminals)
+bindkey '^[[H' beginning-of-line
+bindkey '^[[F' end-of-line
 
+# ===== CUSTOM PATHS & TOOLS =====
+# Add local bin to PATH (if it exists)
+[[ -d "${HOME}/bin" ]] && export PATH="${HOME}/bin:${PATH}"
 
-[[ -f ~/.zshrc.local ]] && source ~/.zshrc.local
+# Load local/non-versioned configs (prioritize .zshrc.local)
+[[ -f "${HOME}/.zshrc.local" ]] && source "${HOME}/.zshrc.local"
+[[ -f "${HOME}/.localrc" ]] && source "${HOME}/.localrc"
+
+# ===== SUGGESTED IMPROVEMENTS =====
+# Uncomment or add as needed:
+# 1. Faster alternative to agnoster:
+#    ZSH_THEME="powerlevel10k/powerlevel10k"  # Requires manual install
+#
+# 2. Python/conda support:
+#    [[ -f "${HOME}/miniconda3/etc/profile.d/conda.sh" ]] && source "${HOME}/miniconda3/etc/profile.d/conda.sh"
+#
+# 3. Fuzzy finder (fzf) integration:
+#    [[ -f "${HOME}/.fzf.zsh" ]] && source "${HOME}/.fzf.zsh"
+#
+# 4. Directory navigation (zoxide or autojump):
+#    eval "$(zoxide init zsh)"  # `z` instead of `cd`
+#
+# 5. Git status in prompt (if not using agnoster):
+#    autoload -Uz vcs_info && zstyle ':vcs_info:*' enable git

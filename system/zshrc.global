@@ -1,65 +1,99 @@
-# ===== System-Wide Zsh Configuration =====
-# Applies to all users (can be overridden in ~/.zshrc)
+#!/usr/bin/env zsh
+# ===== SYSTEM-WIDE ZSH CONFIGURATION =====
+# Applies to all users (overridable in ~/.zshrc)
+# Goals: Safe defaults, performance, and consistency across users.
 
-# ---- Basic Settings ----
-# Set sane defaults for all users
-setopt INC_APPEND_HISTORY       # Write to history immediately
-setopt HIST_IGNORE_ALL_DUPS     # Ignore duplicate commands
-setopt HIST_IGNORE_SPACE        # Don't record commands starting with space
-setopt SHARE_HISTORY            # Share history across sessions
-HISTSIZE=10000                  # Big history
-SAVEHIST=10000
-HISTFILE=~/.zsh_history         # Still user-specific file
+# ===== CORE SHELL BEHAVIOR =====
+# --- History Settings ---
+# System-wide history location (users can override)
+HISTFILE="${HOME}/.zsh_history"
+HISTSIZE=50000                 # Session history limit
+SAVEHIST=10000                 # Saved history limit
+setopt INC_APPEND_HISTORY      # Write to history immediately
+setopt HIST_IGNORE_ALL_DUPS    # Skip duplicate entries
+setopt HIST_IGNORE_SPACE       # Don't record commands starting with space
 
-# ---- Completion System ----
-autoload -Uz compinit && compinit # Basic completion
-zstyle ':completion:*' menu select # Menu-driven completion
-zstyle ':completion:*' list-colors "${(s.:.)LS_COLORS}" # Colorful completion
+# --- Safety & Defaults ---
+umask 022                      # Restrictive file permissions (755 dirs, 644 files)
+setopt NO_BEEP                 # Disable terminal beeps
+setopt INTERACTIVE_COMMENTS    # Allow comments in interactive shells
+stty -ixon                     # Disable Ctrl+S freezing terminal
 
-# ---- Environment Variables ----
-export EDITOR=nano              # Default editor (safe choice)
-export PAGER=less               # Default pager
-export LESS='-R'                # Color support in less
+# ===== COMPLETION SYSTEM =====
+autoload -Uz compinit && compinit  # Initialize completion
+zstyle ':completion:*' menu select # Navigate completions with arrow keys
+zstyle ':completion:*' list-colors "${(s.:.)LS_COLORS}"  # Colorized output
+zstyle ':completion:*' matcher-list 'm:{a-z}={A-Z}'      # Case-insensitive matching
+
+# Cache completions for performance
+zstyle ':completion:*' use-cache on
+zstyle ':completion:*' cache-path "/tmp/.zsh-completion-cache-${USER}"
+
+# ===== ENVIRONMENT VARIABLES =====
+# --- System Locale ---
 export LANG=en_US.UTF-8
 export LC_ALL=en_US.UTF-8
-export DOTFILES_ROOT="/usr/local/share/dotfiles-system"
 
+# --- Default Tools ---
+export EDITOR="nano"           # Safe default (users may override to vim/vscode)
+export PAGER="less"
+export LESS="-R -F -X"         # -R: Color, -F: Exit if one screen, -X: No clear
 
-# ---- Safety Defaults ----
-umask 022                       # Sensible default permissions
-setopt NO_BEEP                  # Disable annoying beeps
-setopt INTERACTIVE_COMMENTS     # Allow comments in interactive shell
+# --- System Paths ---
+export DOTFILES_ROOT="/usr/local/share/dotfiles-system"  # Centralized configs
 
-# ---- System-Specific Paths ----
-# Add system-wide binaries to PATH (if they exist)
-[ -d "/usr/local/bin" ] && export PATH="/usr/local/bin:$PATH"
+# Add secure system paths to $PATH (order matters!)
+paths=(
+  /usr/local/bin               # Local admin-installed binaries
+  /usr/bin                     # Core system binaries
+  /bin
+  /usr/local/sbin              # Local admin-installed system binaries
+  /usr/sbin
+  /sbin
+)
+for p in "${paths[@]}"; do
+  [[ -d "$p" ]] && export PATH="${p}:${PATH}"
+done
 
-# ---- Color Support ----
-# Enable colors for all users if terminal supports it
-if [ -x /usr/bin/dircolors ]; then
-    test -r ~/.dircolors && eval "$(dircolors -b ~/.dircolors)" || eval "$(dircolors -b)"
-    alias ls='ls --color=auto'
-    alias grep='grep --color=auto'
-    alias fgrep='fgrep --color=auto'
-    alias egrep='egrep --color=auto'
+# ===== SAFE ALIASES (NON-DESTRUCTIVE) =====
+# --- File Operations ---
+alias ls="ls --color=auto -hF"  # -h: Human sizes, -F: File type indicators
+alias ll="ls -al"               # Detailed listing
+alias la="ls -A"                # Show hidden files (except . and ..)
+alias grep="grep --color=auto"  # Colorized grep
+alias df="df -h"                # Human-readable disk usage
+alias du="du -h -d 1"           # Human-readable, depth=1 by default
+
+# --- System Tools ---
+alias psg="ps aux | grep -v grep | grep -i"  # Safe process search
+
+# --- GREP ALIAS OPTIMIZATION ---
+# Use ripgrep (rg) if available, falling back to grep
+if command -v rg &> /dev/null; then
+  # Define rg-based grep replacement with sane defaults
+  alias grep="rg \
+    --no-heading \     # Remove 'filename:' headers in piped output
+    --color=always \   # Force color (even when piping)
+    --smart-case \     # Case-sensitive only if pattern has uppercase
+    --hidden \        # Search hidden files/dirs (but respect .gitignore)
+    --follow \        # Follow symlinks
+    --trim"           # Trim leading/trailing whitespace in results
+
+  # Add shortcuts for common grep flags
+  alias grepi="grep -i"          # Case-insensitive
+  alias grepl="grep -l"          # List matching files only
+  alias grepc="grep --count"     # Count matches per file
+else
+  # Fallback to GNU grep with color and warnings
+  alias grep="grep --color=auto --exclude-dir={.git,.svn,.hg}"
 fi
 
-# ---- Safe Aliases ----
-alias ll='ls -alFh'             # Detailed listing
-alias la='ls -A'                # Show hidden files
-alias l='ls -CF'                # Columnized listing
-alias df='df -h'                # Human-readable disk usage
-alias du='du -h'                # Human-readable file sizes
+# ===== SECURITY HARDENING =====
 
-# ---- Security ----
-# Disable Ctrl+S freezing terminal (safe for all users)
-stty -ixon
-
-# ---- Zsh Helpers ----
-# Enable help command for builtins
-autoload -Uz run-help
+# --- Secure Help System ---
+autoload -Uz run-help           # Enhanced help for builtins
 (( ${+aliases[run-help]} )) && unalias run-help
-alias help=run-help
+alias help="run-help"
 
-# ===== End of System-Wide Config =====
-# Users can override these in their ~/.zshrc
+# ===== END SYSTEM CONFIG =====
+# Note: Users should place personal overrides in ~/.zshrc

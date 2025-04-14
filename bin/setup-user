@@ -1,0 +1,82 @@
+#!/usr/bin/env bash
+# User environment setup script (non-invasive)
+
+# Source logging utilities
+DOTFILES_ROOT="/usr/local/share/dotfiles-system"
+USER_CONFIG_DIR="$DOTFILES_SYSTEM_DIR/user"
+source "${DOTFILES_ROOT}/system/scripts/logging.sh"
+
+setup-user() {
+  step "Starting User Environment Setup"
+
+  # 1. Install Oh My Zsh
+  step "Checking Oh My Zsh installation"
+  if [[ ! -d "$HOME/.oh-my-zsh" ]]; then
+    info "Installing Oh My Zsh..."
+    if sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended --keep-zshrc; then
+      success "Oh My Zsh installed successfully"
+    else
+      error "Failed to install Oh My Zsh"
+    fi
+  else
+    success "Oh My Zsh already installed"
+  fi
+
+  # 2. Install LS_COLORS
+  step "Configuring LS_COLORS"
+  if [[ ! -f "$HOME/.dircolors" ]]; then
+    info "Downloading trapd00r/LS_COLORS..."
+    if curl -fsSL https://github.com/trapd00r/LS_COLORS/raw/master/LS_COLORS -o "$HOME/.dircolors" 2>/dev/null; then
+      success "LS_COLORS configured"
+    else
+      warning "Failed to download LS_COLORS, using system defaults"
+      if dircolors --print-database > "$HOME/.dircolors"; then
+        info "Created default .dircolors file"
+      else
+        error "Failed to create .dircolors file"
+      fi
+    fi
+  else
+    success "LS_COLORS already configured"
+  fi
+
+  # 3. Install zsh-completions
+  step "Setting up zsh-completions"
+  local completions_dir="${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}/plugins/zsh-completions"
+  if [[ ! -d "$completions_dir" ]]; then
+    info "Cloning zsh-completions..."
+    if git clone https://github.com/zsh-users/zsh-completions "$completions_dir" 2>/dev/null; then
+      success "zsh-completions installed"
+    else
+      error "Failed to install zsh-completions"
+    fi
+  else
+    success "zsh-completions already installed"
+  fi
+
+  # 4. Install zsh-syntax-highlighting
+  step "Setting up zsh-syntax-highlighting"
+  local highlight_dir="${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}/plugins/zsh-syntax-highlighting"
+  if [[ ! -d "$highlight_dir" ]]; then
+    info "Cloning zsh-syntax-highlighting..."
+    if git clone https://github.com/zsh-users/zsh-syntax-highlighting "$highlight_dir" 2>/dev/null; then
+      success "zsh-syntax-highlighting installed"
+    else
+      error "Failed to install zsh-syntax-highlighting"
+    fi
+  else
+    success "zsh-syntax-highlighting already installed"
+  fi
+
+  step "Setup Complete"
+  success "All components installed"
+  info "Add these to your .zshrc to enable features:"
+  info "plugins=(git zsh-completions zsh-syntax-highlighting)"
+  info 'eval "$(dircolors -b ~/.dircolors)"'
+  cp "$USER_CONFIG_DIR/.zshrc" "$HOME/.zshrc"
+}
+
+# Execute if run directly
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+  setup-user "$@"
+fi
