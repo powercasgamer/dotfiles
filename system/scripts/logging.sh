@@ -26,6 +26,15 @@ function error() {
   exit 1
 }
 
+function confirm() {
+  tput setaf 3
+  echo -n "$1 (y/N): "
+  tput sgr0
+  read -r ans
+  [[ "$ans" =~ ^[Yy]([Ee][Ss])?$ ]]
+}
+
+
 log_init() {
     LOG_FILE=${1:-"script-$(date +%Y%m%d-%H%M%S).log"}
     echo "Logging to $LOG_FILE"

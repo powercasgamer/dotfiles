@@ -1,0 +1,89 @@
+#!/usr/bin/env bash
+
+source "${DOTFILES_ROOT}/system/scripts/logging.sh"
+
+# Function to perform apt maintenance
+function apt_maintenance() {
+  # Prevent removal of critical drivers (like graphics and essential hardware)
+  local critical_packages=$(dpkg-query -l | grep -E 'nvidia|amd|mesa|xorg|firmware' | awk '{print $2}')
+
+  # Hold critical drivers to prevent removal/upgrade
+  for pkg in $critical_packages; do
+    apt-mark hold $pkg
+  done
+
+  # Prompt the user for maintenance choices
+  echo "Select maintenance tasks to run:"
+  echo "1. Update package list"
+  echo "2. Upgrade installed packages"
+  echo "3. Perform distribution upgrade"
+  echo "4. Clean orphaned packages"
+  echo "5. Remove unnecessary packages"
+  echo "6. Clean apt cache"
+  echo "7. Perform all tasks"
+  read -p "Enter the number(s) (comma-separated for multiple tasks, e.g., 1,3,5): " tasks
+
+  # Process selected tasks
+  IFS=',' read -r -a selected_tasks <<<"$tasks"
+
+  for task in "${selected_tasks[@]}"; do
+    case $task in
+    1)
+      echo "Updating package list..."
+      apt update
+      ;;
+    2)
+      echo "Upgrading installed packages..."
+      apt upgrade -y
+      ;;
+    3)
+      echo "Performing distribution upgrade..."
+      apt dist-upgrade -y
+      ;;
+    4)
+      echo "Cleaning orphaned packages..."
+      deborphan | xargs sudo apt-get remove --purge -y
+      ;;
+    5)
+      echo "Removing unnecessary packages..."
+      apt autoremove -y
+      ;;
+    6)
+      echo "Cleaning apt cache..."
+      apt autoclean
+      apt clean
+      ;;
+    7)
+      echo "Performing all tasks..."
+      apt update
+      apt upgrade -y
+      apt dist-upgrade -y
+      deborphan | xargs sudo apt-get remove --purge -y
+      apt autoremove -y
+      apt autoclean
+      apt clean
+      ;;
+    *)
+      echo "Invalid selection: $task"
+      ;;
+    esac
+  done
+
+  # Unhold critical drivers to allow future upgrades if necessary (optional)
+  for pkg in $critical_packages; do
+    apt-mark unhold $pkg
+  done
+}
+
+# Main function to ask the user if they want to run apt maintenance
+function main() {
+  # Ask if the user wants to run apt maintenance
+  if confirm "Do you want to run apt maintenance?"; then
+    apt_maintenance
+  else
+    info "↷ Skipping apt maintenance."
+  fi
+}
+
+# Run the main function
+main
