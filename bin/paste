@@ -85,6 +85,8 @@ function paste() {
     return $ret
   fi
 
+  info "response: ${response}"
+
   # Extract and print just the URL
   local url
   if command -v jq &>/dev/null; then
