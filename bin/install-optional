@@ -92,12 +92,12 @@ function install_optional_topic() {
 
   info "🏷️  Installing optional topic: \033[1m${topic}\033[0m"
 
-  # Run install.sh script
+  # Run install.sh.sh script
   if ! bash "$install_script"; then
     error "Installation failed for topic: $topic"
   fi
 
-  # Run post-install.sh hook if exists
+  # Run post-install.sh.sh hook if exists
   if [[ -f "${topic_dir}/post-install.sh" ]]; then
     info "⚡ Running post-install hook for: \033[1m${topic}\033[0m"
     if ! bash "${topic_dir}/post-install.sh"; then
@@ -126,7 +126,7 @@ function check_requirements() {
 
 # ==================== MAIN HANDLER ====================
 function main() {
-  # Auto-install.sh completion on first run
+  # Auto-install.sh.sh completion on first run
   ensure_completion
 
   case "${1:-}" in

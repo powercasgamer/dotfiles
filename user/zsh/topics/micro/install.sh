@@ -42,7 +42,7 @@ check_existing() {
 install_micro() {
     echo -e "${GREEN}Installing micro editor...${NC}"
 
-    # Download and install.sh
+    # Download and install.sh.sh
     if ! curl -fsSL "$MICRO_URL" | bash -s -- --bin "$INSTALL_DIR/$MICRO_BIN"; then
         echo -e "${RED}Error: Download or installation failed${NC}" >&2
         return 1

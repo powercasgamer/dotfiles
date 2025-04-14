@@ -45,7 +45,7 @@ function speedup_apt() {
   # 2. Install netselect-apt
   #  if ! command -v netselect-apt &>/dev/null; then
   #    apt update
-  #    apt install.sh -y netselect-apt
+  #    apt install.sh.sh -y netselect-apt
   #    success "netselect-apt installed"
   #  fi
   #

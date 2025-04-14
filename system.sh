@@ -152,7 +152,7 @@ install_global_zsh() {
 
 # === Run Installation Hook ===
 run_hook() {
-  local hook_type="$1"  # "install.sh" or "post-install.sh"
+  local hook_type="$1"  # "install.sh.sh" or "post-install.sh.sh"
   local topic_dir="$2"
   local topic_name="$3"
 
@@ -290,13 +290,13 @@ install_topics() {
       continue
     fi
 
-    # Run install.sh hook
+    # Run install.sh.sh hook
     if ! run_hook "install" "$topic_dir" "$topic_name"; then
       [[ "$FORCE" == true ]] && ((skipped++)) || ((failed++))
       continue
     fi
 
-    # Run post-install.sh hook if exists
+    # Run post-install.sh.sh hook if exists
     if ! run_hook "post-install" "$topic_dir" "$topic_name"; then
       [[ "$FORCE" == true ]] && ((skipped++)) || ((failed++))
       continue
@@ -357,13 +357,13 @@ NONEVERinstall_optional_topics() {
       continue
     fi
 
-    # Run install.sh hook
+    # Run install.sh.sh hook
     if ! run_hook "install" "$topic_dir" "$topic_name"; then
       [[ "$FORCE" == true ]] && ((skipped++)) || ((failed++))
       continue
     fi
 
-    # Run post-install.sh hook if exists
+    # Run post-install.sh.sh hook if exists
     if ! run_hook "post-install" "$topic_dir" "$topic_name"; then
       [[ "$FORCE" == true ]] && ((skipped++)) || ((failed++))
       continue

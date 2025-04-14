@@ -47,7 +47,7 @@ zinit snippet OMZL::clipboard.zsh     # Clipboard integration
 zinit snippet OMZL::termsupport.zsh   # Terminal window/tab title support
 
 # Load Powerlevel10k theme
-zinit ice depth"1"  # Shallow clone for faster install.sh
+zinit ice depth"1"  # Shallow clone for faster install.sh.sh
 zinit light romkatv/powerlevel10k
 
 # Configure LS_COLORS (better `ls` colors)

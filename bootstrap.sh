@@ -28,6 +28,7 @@ code() {
 DOTFILES_DIR="${DOTFILES_DIR:-$HOME/dotfiles}"
 ACTUAL_USER=$(logname 2>/dev/null || echo "$SUDO_USER" || whoami)
 ACTUAL_HOME=$(eval echo "~$ACTUAL_USER")
+source "${DOTFILES_ROOT}/system/scripts/logging.sh"
 
 if [ "$(id -u)" -eq 0 ]; then
   DOTFILES_DIR="$ACTUAL_HOME/dotfiles"
@@ -172,15 +173,6 @@ set_zsh_as_default() {
 
   echo "Success! Default shell set to: $zsh_path"
   echo "Note: This change will take effect in new terminal sessions."
-}
-
-# === Prompt Helper ===
-confirm() {
-  tput setaf 3
-  echo -n "$1 (y/N): "
-  tput sgr0
-  read -r ans
-  [[ "$ans" =~ ^[Yy]([Ee][Ss])?$ ]]
 }
 
 # === Main ===
