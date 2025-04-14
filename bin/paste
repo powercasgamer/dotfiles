@@ -1,15 +1,19 @@
-#!/usr/bin/env zsh
+#!/usr/bin/env bash
+# File upload utility using paste.dev API
+# Requires: curl, jq (optional)
+
+# Load logging utilities
+DOTFILES_ROOT="/usr/local/share/dotfiles-system"
+source "${DOTFILES_ROOT}/system/scripts/logging.sh" 2>/dev/null || {
+  echo "Error: Failed to load logging utilities" >&2
+  exit 1
+}
 
 function paste() {
-  emulate -L zsh
-  setopt extendedglob localoptions
-
-  # Force load colors (works in both interactive and non-interactive shells)
-  autoload -Uz colors && colors
-
   # Show help if no arguments
   if [[ $# -eq 0 ]]; then
-    echo "${fg[red]}Usage:${reset_color} paste <file> [language]"
+    error "Usage: paste <file> [language]"
+    info "Available language shortcuts: sh, js, py, java, go, rs, rb, php, json, etc."
     return 1
   fi
 
@@ -20,63 +24,64 @@ function paste() {
 
   # Validate file exists and is readable
   if [[ ! -f "$file" ]] || [[ ! -r "$file" ]]; then
-    echo "${fg[red]}Error:${reset_color} Cannot access file: ${fg[yellow]}${file}${reset_color}" >&2
+    error "Cannot access file: ${file}"
     return 1
   fi
 
   # Extract filename and extension
-  filename=${file:t}
-  extension=${file:e:l}
+  filename=$(basename "$file")
+  extension="${filename##*.}"
+  extension=$(echo "$extension" | tr '[:upper:]' '[:lower:]')
 
   # Language to content-type mapping
-  local -A lang_map=(
-    log      log
-    sh      shell
-    bash    shell
-    zsh     shell
-    js      javascript
-    ts      typescript
-    py      python
-    java    java
-    kt      kotlin
-    kts     kotlin
-    go      go
-    rs      rust
-    rb      ruby
-    php     php
-    pl      perl
-    json    json
-    html    html
-    css     css
-    md      markdown
-    xml     xml
-    yml     yaml
-    yaml    yaml
-    c       c
-    cpp     cpp
-    h       c
-    hpp     cpp
-    cs      csharp
+  declare -A lang_map=(
+    ['log']='log'
+    ['sh']='shell'
+    ['bash']='shell'
+    ['zsh']='shell'
+    ['js']='javascript'
+    ['ts']='typescript'
+    ['py']='python'
+    ['java']='java'
+    ['kt']='kotlin'
+    ['kts']='kotlin'
+    ['go']='go'
+    ['rs']='rust'
+    ['rb']='ruby'
+    ['php']='php'
+    ['pl']='perl'
+    ['json']='json'
+    ['html']='html'
+    ['css']='css'
+    ['md']='markdown'
+    ['xml']='xml'
+    ['yml']='yaml'
+    ['yaml']='yaml'
+    ['c']='c'
+    ['cpp']='cpp'
+    ['h']='c'
+    ['hpp']='cpp'
+    ['cs']='csharp'
   )
 
   # Set content-type
   if [[ -z "$lang" ]]; then
-    lang=${lang_map[$extension]:-plain}
+    lang=${lang_map["$extension"]:-plain}
   fi
   content_type="text/$lang"
 
-  # Colored upload message
-  echo "${fg[blue]}Uploading${reset_color} ${fg[yellow]}${filename}${reset_color} (${fg[green]}${content_type}${reset_color})..." >&2
+  # Upload message
+  step "Uploading ${filename} (${content_type})"
 
-  # Execute curl (without -s flag to see errors)
+  # Execute curl
   local response
   response=$(curl -f -T "$file" -H "Content-Type: $content_type" \
     https://api.pastes.dev/post 2>&1)
 
   local ret=$?
   if [[ $ret -ne 0 ]]; then
-    echo "${fg[red]}Error${reset_color} ($ret): Failed to upload file" >&2
-    echo "$response" >&2
+    error "Failed to upload file (curl error $ret)"
+    info "Server response: ${response}"
     return $ret
   fi
 
@@ -89,19 +94,26 @@ function paste() {
   fi
 
   if [[ -n "$url" ]]; then
-    echo "${fg[green]}Success!${reset_color} Paste URL: ${fg[cyan]}${url}${reset_color}"
+    success "Paste created successfully"
+    info "URL: ${url}"
+
     # Copy to clipboard
     if command -v pbcopy &>/dev/null; then
-      echo -n "$url" | pbcopy && echo "(URL copied to clipboard)"
+      echo -n "$url" | pbcopy && info "URL copied to clipboard (macOS)"
     elif command -v xclip &>/dev/null; then
-      echo -n "$url" | xclip -selection clipboard && echo "(URL copied to clipboard)"
+      echo -n "$url" | xclip -selection clipboard && info "URL copied to clipboard (Linux)"
+    elif command -v wl-copy &>/dev/null; then
+      echo -n "$url" | wl-copy && info "URL copied to clipboard (Wayland)"
     fi
   else
-    echo "$response"
+    error "Failed to parse response"
+    info "Raw response: ${response}"
   fi
 }
 
 # Only run if executed directly (not sourced)
-if [[ "${(%):-%N}" == "paste" ]]; then
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+  # Set default logging level to INFO
+  export LOG_LEVEL="INFO"
   paste "$@"
 fi
