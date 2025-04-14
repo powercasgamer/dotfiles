@@ -85,18 +85,8 @@ function paste() {
     return $ret
   fi
 
-  info "response: ${response}"
-
   # Extract and print just the URL
-  local url
-  if command -v jq &>/dev/null; then
-    url=$(echo "$response" | jq -r '.url // empty' 2>/dev/null)
-  else
-    url=$(echo "$response" | grep -oE '"url":"[^"]+"' | cut -d'"' -f4)
-  fi
-
-  if [[ -n "$url" ]]; then
-    echo "$url"
+  local url = $response
 
     # Copy to clipboard if possible
     if command -v pbcopy &>/dev/null; then
@@ -106,11 +96,6 @@ function paste() {
     elif command -v wl-copy &>/dev/null; then
       echo -n "$url" | wl-copy
     fi
-  else
-    error "Failed to parse response"
-    info "Raw response: ${response}"
-    return 1
-  fi
 }
 
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
