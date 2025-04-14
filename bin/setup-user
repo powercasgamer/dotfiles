@@ -30,7 +30,7 @@ setup-user() {
       success "LS_COLORS configured"
     else
       warning "Failed to download LS_COLORS, using system defaults"
-      if dircolors --print-database > "$HOME/.dircolors"; then
+      if dircolors --print-database >"$HOME/.dircolors"; then
         info "Created default .dircolors file"
       else
         error "Failed to create .dircolors file"
@@ -68,12 +68,37 @@ setup-user() {
     success "zsh-syntax-highlighting already installed"
   fi
 
+  # ===== SETUP COMPLETION =====
   step "Setup Complete"
   success "All components installed"
+
+  # Display configuration instructions
   info "Add these to your .zshrc to enable features:"
   info "plugins=(git zsh-completions zsh-syntax-highlighting)"
   info 'eval "$(dircolors -b ~/.dircolors)"'
-  cp "$USER_CONFIG_DIR/.zshrc" "$HOME/.zshrc"
+
+  # Copy .zshrc with verification
+  if [[ -f "${USER_CONFIG_DIR}/.zshrc" ]]; then
+    if cp -v "${USER_CONFIG_DIR}/.zshrc" "${HOME}/.zshrc"; then
+      success "Successfully copied .zshrc configuration"
+    else
+      error "Failed to copy .zshrc"
+      info "You may need to manually copy:"
+      info "cp '${USER_CONFIG_DIR}/.zshrc' '${HOME}/.zshrc'"
+    fi
+  else
+    error "Source .zshrc not found in ${USER_CONFIG_DIR}"
+    info "Creating default .zshrc instead"
+    touch "${HOME}/.zshrc"
+  fi
+
+  # Verify the file was created
+  if [[ -f "${HOME}/.zshrc" ]]; then
+    chmod 644 "${HOME}/.zshrc"
+    success "Zsh configuration ready at ${HOME}/.zshrc"
+  else
+    error "Failed to initialize .zshrc"
+  fi
 }
 
 # Execute if run directly
