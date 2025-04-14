@@ -68,6 +68,20 @@ setup-user() {
     success "zsh-syntax-highlighting already installed"
   fi
 
+  # 5. Install zsh-autosuggestions
+  step "Setting up zsh-autosuggestions"
+  local autosuggestions_dir="${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}/plugins/zsh-autosuggestions"
+  if [[ ! -d "$autosuggestions_dir" ]]; then
+    info "Cloning zsh-autosuggestions..."
+    if git clone https://github.com/zsh-users/zsh-autosuggestions "$autosuggestions_dir" 2>/dev/null; then
+      success "zsh-autosuggestions installed"
+    else
+      error "Failed to install zsh-autosuggestions"
+    fi
+  else
+    success "zsh-autosuggestions already installed"
+  fi
+
   # ===== SETUP COMPLETION =====
   step "Setup Complete"
   success "All components installed"
