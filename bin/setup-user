@@ -3,7 +3,7 @@
 
 # Source logging utilities
 DOTFILES_ROOT="/usr/local/share/dotfiles-system"
-USER_CONFIG_DIR="$DOTFILES_SYSTEM_DIR/user"
+USER_CONFIG_DIR="$DOTFILES_ROOT/user"
 source "${DOTFILES_ROOT}/system/scripts/logging.sh"
 
 setup-user() {
