@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+
+set -e
+
+# Check if the user provided a search string
+if [[ -z "$1" ]]; then
+  echo "Usage: $0 <search_string> [file_pattern] [context_lines]"
+  exit 1
+fi
+
+# Assign variables
+SEARCH_STRING="$1"
+FILE_PATTERN="${2:-*}" # Default to all files if not provided
+CONTEXT_LINES="${3:-3}" # Default to 3 lines of context if not provided
+
+# Check if ripgrep is installed
+if command -v rg &> /dev/null; then
+  # Use ripgrep
+  rg -i -C "$CONTEXT_LINES" --color=always --glob "$FILE_PATTERN" -z "$SEARCH_STRING"
+else
+  # Use grep
+  grep --color=always -i -C "$CONTEXT_LINES" "$SEARCH_STRING" "$FILE_PATTERN"
+fi

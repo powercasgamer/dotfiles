@@ -199,7 +199,7 @@ Unattended-Upgrade::Allowed-Origins {
 Unattended-Upgrade::Package-Blacklist {
   // "docker-ce";
 };
-Unattended-Upgrade::Automatic-Reboot "true";
+Unattended-Upgrade::Automatic-Reboot "false";
 Unattended-Upgrade::Automatic-Reboot-Time "02:00";
 EOF
 }
@@ -212,7 +212,7 @@ function main() {
   # System Hardening
   secure_apt
   #  harden_kernel
-  setup_fail2ban
+#  setup_fail2ban
   optimize_systemd
   #  enable_autoupdates
 

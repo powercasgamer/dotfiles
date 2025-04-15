@@ -63,7 +63,7 @@ fi
 
 ### phpMyAdmin ###
 if [ -d "/usr/share/phpmyadmin" ] || [ -d "/var/www/html/phpmyadmin" ]; then
-    add_jail "phpmyadmin" "phpmyadmin" "/var/log/phpmyadmin/error.log" "http,https"
+    add_jail "phpmyadmin" "phpmyadmin" "/var/log/syslog" "http,https"
 fi
 
 ### Pterodactyl Panel  ###

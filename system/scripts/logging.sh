@@ -27,6 +27,7 @@ function step() {
 
 function error() {
   echo -e "${RED}[✗]${NC} $*" >&2
+  [[ -n "$2" ]] && $2
   exit 1
 }
 
