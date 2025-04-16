@@ -1,0 +1,249 @@
+#!/usr/bin/env bash
+
+# =============================================
+# GLOBAL CONFIGURATION
+# =============================================
+readonly LOG_FILE="/var/log/user_creation.log"
+readonly ALLOWED_KEYS="/home/dotfiles/allowed_keys"
+readonly MAX_USERNAME_LENGTH=32
+readonly DEFAULT_SHELL="/bin/zsh"
+readonly REQUIRED_COMMANDS=("curl" "jq" "adduser" "usermod")
+
+DOTFILES_ROOT="/usr/local/share/dotfiles-system"
+source "${DOTFILES_ROOT}/system/scripts/logging.sh"
+
+# =============================================
+# UTILITY FUNCTIONS
+# =============================================
+
+# Validate command dependencies
+check_dependencies() {
+  for cmd in "${REQUIRED_COMMANDS[@]}"; do
+    if ! command -v "$cmd" >/dev/null 2>&1; then
+      error "Required command '$cmd' not found. Please install it first."
+    fi
+  done
+}
+
+# =============================================
+# CORE FUNCTIONALITY
+# =============================================
+
+validate_username() {
+  local username="$1"
+
+  if [ -z "$username" ] || [ "${#username}" -gt "$MAX_USERNAME_LENGTH" ]; then
+    error "Username must be 1-$MAX_USERNAME_LENGTH characters long."
+  fi
+
+  if ! [[ "$username" =~ ^[a-z_][a-z0-9_-]*$ ]]; then
+    error "Invalid username. Must start with a letter/underscore and contain only [a-z0-9_-]."
+  fi
+
+  if id -u "$username" >/dev/null 2>&1; then
+    error "User '$username' already exists."
+  fi
+}
+
+create_user_account() {
+  local username="$1"
+
+  info "Creating user account: $username"
+  adduser --home "/home/$username" --shell "$DEFAULT_SHELL" --gecos "" --disabled-password "$username" ||
+    error "Failed to create user '$username'"
+}
+
+setup_user_groups() {
+    local username="$1"
+
+    # Handle Minecraft group specially (check existence first)
+    if getent group minecraft >/dev/null; then
+        if confirm "Add user '$username' to minecraft group?"; then
+            add_to_group "$username" "minecraft"
+        fi
+    else
+        warn "minecraft group not found - skipping"
+    fi
+
+    # Prompt for additional groups
+    while confirm "Would you like to add user '$username' to any other groups?"; do
+        read -rp "Enter group name (or leave blank to finish): " group_name
+
+        # Exit if blank input
+        [ -z "$group_name" ] && break
+
+        if getent group "$group_name" >/dev/null; then
+            add_to_group "$username" "$group_name"
+        else
+            warn "Group '$group_name' does not exist (skipping)"
+        fi
+    done
+}
+
+add_to_group() {
+    local username="$1"
+    local group="$2"
+
+    if usermod -aG "$group" "$username"; then
+        info "Successfully added $username to $group group"
+        return 0
+    else
+        warn "Failed to add $username to $group group"
+        return 1
+    fi
+}
+
+import_github_keys() {
+  local github_username="$1"
+  local temp_file=$(mktemp)
+  local api_url="https://api.github.com/users/$github_username/keys"
+
+  info "Fetching SSH keys from GitHub for user: $github_username"
+  local response=$(curl -s "$api_url")
+
+  if [[ "$response" == *"Not Found"* ]]; then
+    error "GitHub user '$github_username' not found."
+  fi
+
+  if ! echo "$response" | jq -r '.[].key' >"$temp_file" 2>/dev/null; then
+    error "Failed to parse GitHub API response."
+  fi
+
+  if [ ! -s "$temp_file" ]; then
+    error "No SSH keys found for GitHub user '$github_username'."
+  fi
+
+  info "Fetched $(wc -l <"$temp_file") SSH keys from GitHub"
+  echo "$temp_file"
+}
+
+setup_ssh_access() {
+  local username="$1"
+  local key_source="$2"
+  local key_source_value="$3"
+  local user_home="/home/$username"
+  local user_ssh_dir="$user_home/.ssh"
+
+  info "Setting up SSH access for $username"
+  mkdir -p "$user_ssh_dir" || error "Failed to create .ssh directory"
+
+  case "$key_source" in
+  "github")
+    local key_file=$(import_github_keys "$key_source_value")
+    cat "$key_file" >>"$user_ssh_dir/authorized_keys"
+    rm -f "$key_file"
+    ;;
+  "local")
+    [ ! -f "$ALLOWED_KEYS" ] && error "SSH keys file not found at $ALLOWED_KEYS"
+    cp "$ALLOWED_KEYS" "$user_ssh_dir/authorized_keys" || error "Failed to copy SSH keys"
+    ;;
+  *)
+    error "Invalid SSH key source specified"
+    ;;
+  esac
+
+  chown -R "$username:$username" "$user_ssh_dir" || error "Failed to set .ssh ownership"
+  chmod 700 "$user_ssh_dir" || error "Failed to set .ssh permissions"
+  chmod 600 "$user_ssh_dir/authorized_keys" || error "Failed to set authorized_keys permissions"
+}
+
+secure_home_directory() {
+  local username="$1"
+  local user_home="/home/$username"
+
+  info "Securing home directory permissions"
+  chmod 750 "$user_home" || warn "Failed to set home directory permissions"
+  chown "$username:$username" "$user_home" || warn "Failed to set home directory ownership"
+}
+
+display_summary() {
+  local username="$1"
+  local key_source="$2"
+  local github_user="$3"
+
+  success "User creation completed: $username"
+  cat <<EOF
+✅ User '$username' created successfully with:
+   - Default shell: $DEFAULT_SHELL
+   - Sudo privileges
+   - SSH keys imported from: ${key_source}${github_user:+ ($github_user)}
+EOF
+
+  if getent group minecraft >/dev/null && id -nG "$username" | grep -qw minecraft; then
+    echo "   - Added to minecraft group"
+  fi
+}
+
+# =============================================
+# MAIN FLOW
+# =============================================
+
+parse_arguments() {
+  local username=""
+  local github_user=""
+  local key_source="local"
+
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+    --github)
+      [ -z "$2" ] && error "--github requires a GitHub username"
+      github_user="$2"
+      key_source="github"
+      shift 2
+      ;;
+    --help | -h)
+      show_usage
+      ;;
+    -*)
+      error "Unknown option $1"
+      ;;
+    *)
+      [ -z "$username" ] && username="$1" || error "Too many arguments"
+      shift
+      ;;
+    esac
+  done
+
+  [ -z "$username" ] && read -rp "Enter the new username: " username
+
+  echo "$username" "$key_source" "$github_user"
+}
+
+show_usage() {
+  cat <<EOF
+Usage: $0 [username] [--github GITHUB_USERNAME]
+
+Options:
+  username              The username to create (will prompt if not provided)
+  --github USERNAME     Import SSH keys from GitHub user's account
+EOF
+  exit 0
+}
+
+main() {
+  # Initial checks
+  [ "$(id -u)" -ne 0 ] && error "This script must be run as root"
+  check_dependencies
+
+  # Parse arguments and get configuration
+  read -r username key_source github_user <<<"$(parse_arguments "$@")"
+
+  # Validate input
+  validate_username "$username"
+
+  # User creation flow
+  create_user_account "$username"
+    setup_user_groups "$username"
+  if confirm "Make user '$username' a sudo user?"; then
+    info "Adding $username to sudo group"
+    usermod -aG sudo "$username" ||
+      error "Failed to add '$username' to sudo group"
+  fi
+  setup_ssh_access "$username" "$key_source" "$github_user"
+  secure_home_directory "$username"
+
+  # Final output
+  display_summary "$username" "$key_source" "$github_user"
+}
+
+main "$@"
