@@ -6,6 +6,7 @@ VOLUMES_DIR="/var/lib/pterodactyl/volumes"
 TARGET_DIR="/home/servers"
 LOG_FILE="/var/log/pterodactyl-symlinks.log"
 DRY_RUN=false
+TARGET_GROUP="minecraft"  # New configuration for group ownership
 
 # Color codes
 GREEN='\033[0;32m'
@@ -15,7 +16,6 @@ NC='\033[0m' # No Color
 
 # Initialize
 declare -A valid_symlinks
-mkdir -p "$TARGET_DIR"
 
 # Enhanced logging
 log() {
@@ -46,6 +46,48 @@ validate_symlink() {
     local actual_uuid=$(basename "$target")
 
     [[ "$actual_uuid" == "$expected_uuid" ]]
+}
+
+# Ensure target directory has correct permissions
+setup_target_dir() {
+    log INFO "Setting up target directory with $TARGET_GROUP group ownership"
+
+    # Create directory if it doesn't exist
+    if [[ ! -d "$TARGET_DIR" ]]; then
+        if [[ "$DRY_RUN" == true ]]; then
+            log INFO "Would create directory: $TARGET_DIR"
+            return
+        fi
+
+        mkdir -p "$TARGET_DIR" || {
+            log ERROR "Failed to create target directory: $TARGET_DIR"
+            exit 1
+        }
+    fi
+
+    # Check and set group ownership
+    local current_group=$(stat -c '%G' "$TARGET_DIR")
+    if [[ "$current_group" != "$TARGET_GROUP" ]]; then
+        if [[ "$DRY_RUN" == true ]]; then
+            log INFO "Would change group ownership to $TARGET_GROUP for $TARGET_DIR"
+        else
+            if ! chown :"$TARGET_GROUP" "$TARGET_DIR"; then
+                log ERROR "Failed to set group ownership for $TARGET_DIR"
+                exit 1
+            fi
+            log INFO "Set group ownership to $TARGET_GROUP for $TARGET_DIR"
+        fi
+    fi
+
+    # Set correct permissions (rwx for group)
+    if [[ "$DRY_RUN" == true ]]; then
+        log INFO "Would set permissions to 2775 for $TARGET_DIR"
+    else
+        chmod 2775 "$TARGET_DIR" || {
+            log ERROR "Failed to set permissions for $TARGET_DIR"
+            exit 1
+        }
+    fi
 }
 
 # Clean up orphaned symlinks
@@ -101,6 +143,8 @@ process_servers() {
         log INFO "Would create symlink: $server_name → $uuid"
         if [[ "$DRY_RUN" == false ]]; then
             ln -sfn "$(dirname "$name_file")" "$symlink_path"
+            # Ensure new symlink has correct group ownership
+            chown :"$TARGET_GROUP" "$symlink_path"
             log INFO "Created/updated symlink: $server_name → $uuid"
         fi
     done < <(find "$VOLUMES_DIR" -type f -name 'server-name' -print0)
@@ -127,6 +171,10 @@ show_help() {
     echo "Options:"
     echo "  -d, --dry-run    Simulation mode (no changes made)"
     echo "  -h, --help       Show this help message"
+    echo ""
+    echo "Configuration:"
+    echo "  Target directory: $TARGET_DIR"
+    echo "  Group ownership: $TARGET_GROUP"
 }
 
 # Main execution
@@ -146,7 +194,9 @@ main() {
     fi
 
     [[ ! -d "$VOLUMES_DIR" ]] && { log ERROR "Volumes directory missing: $VOLUMES_DIR"; exit 1; }
-    mkdir -p "$TARGET_DIR" || { log ERROR "Cannot create target directory"; exit 1; }
+
+    # Setup target directory with proper permissions
+    setup_target_dir
 
     process_servers
 }

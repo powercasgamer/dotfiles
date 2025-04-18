@@ -1,0 +1,133 @@
+#!/usr/bin/env bash
+
+# Initialize project script with Gradle template support
+# Usage: ./init-project
+
+# Configuration
+DOTFILES_ROOT="/usr/local/share/dotfiles-system"
+TEMPLATE_DIR="${DOTFILES_ROOT}/template"
+GRADLE_TEMPLATE_DIR="${TEMPLATE_DIR}/gradle".
+source "${DOTFILES_ROOT}/system/scripts/logging.sh"
+
+# Function to replace placeholders in files
+function replace_placeholders() {
+    local target_dir=$1
+    local project_name=$2
+    local package_name=$3
+
+    find "$target_dir" -type f -exec sed -i '' \
+        -e "s/{{PROJECT_NAME}}/$project_name/g" \
+        -e "s/{{PACKAGE_NAME}}/$package_name/g" \
+        {} +
+}
+
+# Function to initialize Gradle project
+function init_gradle_project() {
+    local project_dir=$1
+    local project_name=$2
+    local package_name=$3
+    local project_type=$4
+
+    step "Initializing Gradle project"
+
+    # Select template type
+    case "$project_type" in
+        "single"|"multi")
+            template_path="${GRADLE_TEMPLATE_DIR}/${project_type}"
+            ;;
+        *)
+            error "Invalid project type. Choose 'single' or 'multi'"
+            ;;
+    esac
+
+    if [[ ! -d "$template_path" ]]; then
+        error "Template directory not found: $template_path"
+    fi
+
+    # Copy template files
+    if ! cp -R "$template_path/." "$project_dir"; then
+        error "Failed to copy template files"
+    fi
+
+    # Replace placeholders
+    replace_placeholders "$project_dir" "$project_name" "$package_name"
+
+    success "Gradle project initialized with $project_type template"
+}
+
+# Main function
+function main() {
+    step "Starting Gradle project initialization"
+
+    # Get project name
+    while true; do
+        read -rp "$(info "Enter project name (lowercase, hyphen-separated): ")" project_name
+        if [[ -z "$project_name" ]]; then
+            error "Project name cannot be empty"
+        elif [[ ! "$project_name" =~ ^[a-z0-9-]+$ ]]; then
+            warning "Project name should be lowercase with hyphens only"
+        else
+            break
+        fi
+    done
+
+    # Get package name (Java convention)
+    while true; do
+        read -rp "$(info "Enter base package name (e.g., com.example): ")" package_name
+        if [[ -z "$package_name" ]]; then
+            error "Package name cannot be empty"
+        elif [[ ! "$package_name" =~ ^[a-z][a-z0-9]*(\.[a-z][a-z0-9]*)*$ ]]; then
+            warning "Package name should follow Java conventions (e.g., com.example)"
+        else
+            break
+        fi
+    done
+
+    # Select project type
+    step "Select Gradle project type:"
+    PS3="$(info "Choose an option (1-2): ")"
+    select project_type in "Single-module" "Multi-module"; do
+        case $REPLY in
+            1) template_type="single"; break ;;
+            2) template_type="multi"; break ;;
+            *) warning "Invalid selection, please try again" ;;
+        esac
+    done
+
+    # Create project directory
+    project_dir="$(pwd)/$project_name"
+    if [[ -d "$project_dir" ]]; then
+        error "Directory '$project_name' already exists"
+    fi
+
+    mkdir -p "$project_dir"
+    success "Created project directory: $project_dir"
+
+    # Initialize Gradle project
+    init_gradle_project "$project_dir" "$project_name" "$package_name" "$template_type"
+
+    # Initialize Git repository if requested
+    if confirm "Initialize Git repository?"; then
+        if command -v git &> /dev/null; then
+            if git init "$project_dir" &> /dev/null; then
+                success "Initialized Git repository"
+            else
+                warning "Failed to initialize Git repository"
+            fi
+        else
+            warning "Git is not installed, skipping repository initialization"
+        fi
+    fi
+
+    # Summary
+    step "Project Initialization Complete"
+    info "Project Name: $project_name"
+    info "Package Name: $package_name"
+    info "Project Type: $template_type-module"
+    info "Location: $project_dir"
+
+    success "Your Gradle project is ready!"
+}
+
+# Run main function
+main
