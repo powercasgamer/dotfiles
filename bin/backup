@@ -1,0 +1,58 @@
+#!/usr/bin/env bash
+
+DOTFILES_ROOT="/usr/local/share/dotfiles-system"
+source "${DOTFILES_ROOT}/system/scripts/logging.sh"
+
+sanitize_name() {
+    echo "$1" | sed 's/[^a-zA-Z0-9._-]/_/g'
+}
+
+# Defaults
+compress_level=3
+timestamp=$(date +%Y-%m-%d_%H-%M-%S.%3N)
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        -l|--level) compress_level="$2"; shift 2 ;;
+        -n|--dry-run) dry_run=true; shift ;;
+        -p|--progress) show_progress=true; shift ;;
+        -c|--checksum) gen_checksum=true; shift ;;
+        -P|--parallel) parallel=true; shift ;;
+        -h|--help) show_help; exit 0 ;;
+        *) targets+=("$1"); shift ;;
+    esac
+done
+
+for target in "${targets[@]}"; do
+    [ ! -e "$target" ] && echo "Error: '$target' does not exist" >&2 && continue
+
+    clean_name=$(sanitize_name "$(basename "$target")")
+    output="${clean_name}_${timestamp}.tar.zst"
+    zstd_flags=(-$compress_level)
+    [[ "$parallel" = true ]] && zstd_flags+=(-T0)
+
+    # Build the compression command
+    if [[ "$show_progress" = true ]] && command -v pv >/dev/null; then
+        # For directories: show progress via tar's file count
+        if [ -d "$target" ]; then
+            file_count=$(find "$target" -type f | wc -l)
+            compress_cmd="tar -cf - '$target' | pv -s $file_count | zstd ${zstd_flags[@]} -o '$output'"
+        else
+            # For files: use pv with known file size
+            file_size=$(stat -c%s "$target")
+            compress_cmd="pv -s $file_size '$target' | zstd ${zstd_flags[@]} -o '$output'"
+        fi
+    else
+        # Standard compression without progress
+        compress_cmd="tar -I 'zstd ${zstd_flags[@]}' -cf '$output' '$target'"
+    fi
+
+    [[ "$dry_run" = true ]] && echo "[DRY RUN] $compress_cmd" && continue
+
+    if eval "$compress_cmd"; then
+        [[ "$gen_checksum" != false ]] && sha256sum "$output" > "$output.sha256"
+        info "Created: $output ($(du -h "$output" | cut -f1))"
+    else
+        error "Error: Failed to compress '$target'"
+    fi
+done

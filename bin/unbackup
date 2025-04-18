@@ -1,0 +1,50 @@
+#!/usr/bin/env bash
+
+DOTFILES_ROOT="/usr/local/share/dotfiles-system"
+source "${DOTFILES_ROOT}/system/scripts/logging.sh"
+
+if [ $# -eq 0 ]; then
+    cat <<EOF
+Usage: unbackup <backup_file.tar.zst> [additional_files...]
+
+Extracts timestamped backups created by the 'backup' command:
+- Removes timestamp to restore original filename/directory
+- Preserves file permissions and structure
+
+Example:
+  unbackup project_2023-11-15_14-30-00.123.tar.zst
+EOF
+    exit 1
+fi
+
+for backup_file in "$@"; do
+    # 1. Input Validation
+    if [ ! -f "$backup_file" ]; then
+        echo "Error: '$backup_file' not found" >&2
+        continue
+    fi
+
+    # 2. Handle .tar.zst files (directory backups)
+    if [[ "$backup_file" == *.tar.zst ]]; then
+        original_name=$(echo "$backup_file" | sed -E 's/_([0-9]{4}-[0-9]{2}-[0-9]{2}_[0-9]{2}-[0-9]{2}-[0-9]{2}\.[0-9]{3}).tar.zst$//')
+        echo "Extracting: $backup_file → $original_name/"
+        tar --zstd -xf "$backup_file"
+
+    # 3. Handle single-file .zst backups (if you ever create them)
+    elif [[ "$backup_file" == *.zst ]]; then
+        original_name=$(echo "$backup_file" | sed -E 's/_([0-9]{4}-[0-9]{2}-[0-9]{2}_[0-9]{2}-[0-9]{2}-[0-9]{2}\.[0-9]{3}).zst$//')
+        echo "Restoring: $backup_file → $original_name"
+        zstd -d --rm -q -o "$original_name" "$backup_file"
+
+    else
+        error "Error: '$backup_file' must be a .tar.zst or .zst file"
+    fi
+
+    # 4. Verify checksum if available
+    if [ -f "$backup_file.sha256" ]; then
+        info "Verifying checksum..."
+        (cd "$(dirname "$backup_file")" && sha256sum -c "$(basename "$backup_file.sha256")") || {
+            error "Checksum verification failed!"
+        }
+    fi
+done

@@ -1,0 +1,80 @@
+#!/usr/bin/env bash
+
+copy() {
+    if [ $# -lt 2 ]; then
+        cat <<EOF
+Usage: copy [OPTIONS] <source> <destination>
+
+Automatic rsync with ALL these flags always enabled:
+  -a                     Archive mode (recursive + preserve metadata)
+  -h                     Human-readable numbers
+  --progress             Per-file progress
+  --stats                Transfer summary
+  --partial              Resume interrupted transfers
+  --info=progress2       Global progress bar
+  --no-i-r               Cleaner output
+  (Auto SSH + compression for remote paths)
+
+Optional flags:
+  -v                     Extra verbose output
+  --exclude=PATTERN      Exclude files matching pattern
+EOF
+        return 1
+    fi
+
+    # All original automatic flags (EXACTLY as you wanted)
+    local base_flags=(
+        -a
+        -h
+        --progress
+        --partial
+        --info=progress2
+        --no-i-r
+    )
+
+    # User-provided arguments
+    local user_args=()
+    local verbose=0
+    local exclude=()
+
+    # Parse optional flags
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            -v)
+                verbose=1
+                shift
+                ;;
+            --exclude=*)
+                exclude+=("$1")
+                shift
+                ;;
+            --exclude)
+                exclude+=(--exclude="$2")
+                shift 2
+                ;;
+            *)
+                user_args+=("$1")
+                shift
+                ;;
+        esac
+    done
+
+    # Auto SSH detection
+    if [[ "${user_args[0]}" =~ @|: ]] || [[ "${user_args[1]}" =~ @|: ]]; then
+        base_flags+=(-e ssh -z)
+    fi
+
+    # Build final command
+    local cmd=(rsync)
+    cmd+=("${base_flags[@]}")
+    [[ $verbose -eq 1 ]] && cmd+=(-v)
+    cmd+=("${exclude[@]}")
+    cmd+=("${user_args[@]}")
+
+    # Execute
+    "${cmd[@]}"
+}
+
+if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+    copy "$@"
+fi

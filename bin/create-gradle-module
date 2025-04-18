@@ -1,0 +1,110 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+show_help() {
+  cat <<EOF
+Usage: $(basename "$0") [OPTIONS] <module-name>
+Create a new Gradle module with basic structure
+
+Options:
+  -p, --package   Specify package name (default: com.example.<module-name>)
+  -k, --kotlin    Create Kotlin directory structure
+  -t, --tests     Create tests directory structure
+  -r, --resources Create resources directory structure
+  -h, --help      Show this help message
+
+Example:
+  $(basename "$0") -k -p com.myapp my-module
+EOF
+}
+
+# Initialize variables
+USE_KOTLIN=false
+USE_TESTS=false
+USE_RESOURCES=false
+PACKAGE=""
+
+# Parse arguments
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -p|--package)
+      [[ $# -lt 2 ]] && { echo "Error: Package name missing"; show_help; exit 1; }
+      PACKAGE="$2"
+      shift 2
+      ;;
+    -k|--kotlin) USE_KOTLIN=true; shift ;;
+    -t|--tests) USE_TESTS=true; shift ;;
+    -r|--resources) USE_RESOURCES=true; shift ;;
+    -h|--help) show_help; exit 0 ;;
+    -*)
+      echo "Error: Unknown option $1"
+      show_help
+      exit 1
+      ;;
+    *)
+      [[ -n "$MODULE_NAME" ]] && { echo "Error: Multiple module names specified"; show_help; exit 1; }
+      MODULE_NAME="$1"
+      shift
+      ;;
+  esac
+done
+
+# Validate module name
+if [[ -z "${MODULE_NAME:-}" ]]; then
+  echo "Error: Module name is required."
+  show_help
+  exit 1
+fi
+
+# Validate package name if provided
+if [[ -n "$PACKAGE" ]] && [[ ! "$PACKAGE" =~ ^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)*$ ]]; then
+  echo "Error: Invalid package name '$PACKAGE'"
+  exit 1
+fi
+
+# Set default package if not specified
+if [[ -z "$PACKAGE" ]]; then
+  PACKAGE="com.example.${MODULE_NAME//-/.}"
+fi
+
+MODULE_PATH="$MODULE_NAME"
+
+# Check if module directory already exists
+if [[ -e "$MODULE_PATH" ]]; then
+  echo "Error: Path '$MODULE_PATH' already exists."
+  exit 1
+fi
+
+# Create module structure
+echo "Creating module '$MODULE_NAME' with package '$PACKAGE'..."
+
+mkdir -p "$MODULE_PATH"
+
+# Create source directories
+SRC_DIR="src/main/kotlin" && $USE_KOTLIN || SRC_DIR="src/main/java"
+mkdir -p "$MODULE_PATH/$SRC_DIR/${PACKAGE//./\/}"
+
+# Create test directories if requested
+if $USE_TESTS; then
+  TEST_DIR="src/test/kotlin" && $USE_KOTLIN || TEST_DIR="src/test/java"
+  mkdir -p "$MODULE_PATH/$TEST_DIR/${PACKAGE//./\/}"
+fi
+
+# Create resources directory if requested
+if $USE_RESOURCES; then
+  mkdir -p "$MODULE_PATH/src/main/resources"
+fi
+
+# Create minimal build.gradle.kts
+cat > "$MODULE_PATH/build.gradle.kts" <<EOF
+dependencies {
+}
+EOF
+
+# Print summary
+echo "Created:"
+echo "  - $SRC_DIR/${PACKAGE//./\/}"
+$USE_TESTS && echo "  - $TEST_DIR/${PACKAGE//./\/}"
+$USE_RESOURCES && echo "  - src/main/resources"
+echo "  - build.gradle.kts"
