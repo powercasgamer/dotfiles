@@ -1,0 +1,63 @@
+#!/usr/bin/env bash
+
+# Configuration
+DOTFILES_ROOT="/usr/local/share/dotfiles-system"
+SCRIPTS_DIR="${DOTFILES_ROOT}/system/scripts"
+AUTO_PUSH=false
+AUTO_PULL=false
+
+# Parse arguments
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --push) AUTO_PUSH=true; shift ;;
+    --pull) AUTO_PULL=true; shift ;;
+    *) error "Unknown option: $1" ;;
+  esac
+done
+
+# Source utility scripts
+[[ -f "${SCRIPTS_DIR}/scripts.sh" ]] && source "${SCRIPTS_DIR}/scripts.sh"
+
+# Validate git repository
+git rev-parse --is-inside-work-tree >/dev/null 2>&1 || error "Current directory is not a git repository"
+
+# Exit if no changes
+[[ -z $(git status --porcelain) ]] && info "Working directory clean - nothing to commit" && exit 0
+
+# Show changes
+info "Changes detected:"
+git diff --stat && echo ""
+
+# Sync with remote if requested
+if $AUTO_PULL || $AUTO_PUSH; then
+  step "Checking remote..."
+  git fetch
+
+  HEADHASH=$(git rev-parse HEAD)
+  UPSTREAMHASH=$(git rev-parse @{u})
+
+  if [[ "$HEADHASH" != "$UPSTREAMHASH" ]]; then
+    step "Pulling remote changes..."
+    git pull --rebase || error "Failed to pull changes"
+    success "Successfully updated"
+  fi
+fi
+
+# Commit changes
+step "Staging changes..."
+git add .
+
+step "Creating commit..."
+if git commit -m "Update dotfiles"; then
+  success "Changes committed"
+
+  # Push if enabled
+  if $AUTO_PUSH; then
+    step "Pushing changes..."
+    git push && success "Changes pushed successfully" || error "Failed to push changes"
+  else
+    info "Tip: Use --push to auto-push changes"
+  fi
+else
+  error "Failed to create commit"
+fi

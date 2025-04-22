@@ -1,0 +1,191 @@
+#!/usr/bin/env bash
+
+# === Cross-platform Visual Functions ===
+info() {
+  if [[ "$TERM" == "dumb" ]]; then
+    echo "[SYSTEM] $@"
+  else
+    tput setaf 4 2>/dev/null || echo ""
+    echo "[SYSTEM] $@"
+    tput sgr0 2>/dev/null || echo ""
+  fi
+}
+
+warning() {
+  if [[ "$TERM" == "dumb" ]]; then
+    echo "[WARNING] $@"
+  else
+    tput setaf 3 2>/dev/null || echo ""
+    tput bold 2>/dev/null || echo ""
+    echo "[WARNING] $@"
+    tput sgr0 2>/dev/null || echo ""
+  fi
+  sleep 0.5
+}
+
+success() {
+  if [[ "$TERM" == "dumb" ]]; then
+    echo "[SUCCESS] $@"
+  else
+    tput setaf 2 2>/dev/null || echo ""
+    echo "[SUCCESS] $@"
+    tput sgr0 2>/dev/null || echo ""
+  fi
+}
+
+error() {
+  if [[ "$TERM" == "dumb" ]]; then
+    echo "[ERROR] $@" >&2
+  else
+    tput setaf 1 2>/dev/null || echo ""
+    tput bold 2>/dev/null || echo ""
+    echo "[ERROR] $@" >&2
+    tput sgr0 2>/dev/null || echo ""
+  fi
+  return 1
+}
+
+# === Environment Setup ===
+DOTFILES_REPO="https://github.com/powercasgamer/dotfiles.git"
+
+# Platform-specific paths
+if [[ "$(uname)" == "Darwin" ]]; then
+  # macOS paths
+  DOTFILES_SYSTEM_DIR="/usr/local/share/dotfiles-system"
+  GLOBAL_BIN_TARGET="/usr/local/bin"
+else
+  # Linux paths
+  DOTFILES_SYSTEM_DIR="/usr/local/share/dotfiles-system"
+  GLOBAL_BIN_TARGET="/usr/local/bin"
+fi
+
+SYSTEM_CONFIG_DIR="$DOTFILES_SYSTEM_DIR/system"
+SYSTEM_BIN_SOURCE="$DOTFILES_SYSTEM_DIR/bin"
+
+# === Cross-platform Git Operations ===
+git_clone() {
+  local repo="$1"
+  local target="$2"
+  sudo -H git clone "$repo" "$target" || return 1
+  sudo chmod 755 "$target"
+}
+
+git_pull() {
+  local target="$1"
+  sudo -H git -C "$target" pull || return 1
+}
+
+# === Clone Dotfiles ===
+clone_dotfiles() {
+  info "Cloning dotfiles repository..."
+
+  reclone_repository() {
+    warning "Resetting dotfiles repository due to conflicts/errors..."
+    sudo rm -rf "$DOTFILES_SYSTEM_DIR"
+    git_clone "$DOTFILES_REPO" "$DOTFILES_SYSTEM_DIR" || {
+      error "Failed to reclone repository!"
+      return 1
+    }
+  }
+
+  # First-time clone
+  if [[ ! -d "$DOTFILES_SYSTEM_DIR" ]]; then
+    if ! git_clone "$DOTFILES_REPO" "$DOTFILES_SYSTEM_DIR"; then
+      error "Failed to clone dotfiles repository!"
+      return 1
+    fi
+  else
+    # Existing repository - attempt to update
+    info "Updating existing dotfiles..."
+
+    # Check if the directory is a git repository
+    if ! sudo git -C "$DOTFILES_SYSTEM_DIR" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+      warning "Directory exists but is not a git repository - recreating..."
+      reclone_repository || return 1
+    else
+      # Check for uncommitted changes
+      if [[ -n $(sudo git -C "$DOTFILES_SYSTEM_DIR" status -s) ]]; then
+        warning "Found uncommitted changes - stashing them..."
+        if ! sudo git -C "$DOTFILES_SYSTEM_DIR" stash; then
+          error "Failed to stash changes - resetting repository..."
+          reclone_repository || return 1
+        fi
+      fi
+
+      # Attempt to pull changes
+      if ! git_pull "$DOTFILES_SYSTEM_DIR"; then
+        warning "Pull failed due to conflicts - resetting repository..."
+        reclone_repository || return 1
+      fi
+    fi
+  fi
+
+  # Verify system folder exists
+  if [[ ! -d "$SYSTEM_CONFIG_DIR" ]]; then
+    error "No 'system' folder found in dotfiles repository!"
+    return 1
+  fi
+
+  success "Dotfiles repository ready at $DOTFILES_SYSTEM_DIR"
+  return 0
+}
+
+# === Cross-platform Binary Installation ===
+install_system_binaries() {
+  info "Deploying system binaries..."
+
+  # Verify source directory exists
+  if [[ ! -d "$SYSTEM_BIN_SOURCE" ]]; then
+    warning "No system/bin directory found in dotfiles!"
+    return 1
+  fi
+
+  # Ensure target directory exists
+  sudo mkdir -p "$GLOBAL_BIN_TARGET"
+
+  # Symlink each executable
+  for script in "$SYSTEM_BIN_SOURCE"/*; do
+    [[ ! -f "$script" ]] && continue
+
+    local script_name=$(basename "$script")
+    local target="$GLOBAL_BIN_TARGET/$script_name"
+
+    # Make file executable if it isn't
+    if [[ ! -x "$script" ]]; then
+      sudo chmod +x "$script" || {
+        warning "Could not make $script_name executable"
+        continue
+      }
+    fi
+
+    # Backup existing binaries
+    if [[ -e "$target" ]] && ! [[ -L "$target" ]]; then
+      sudo mv "$target" "${target}.bak" && info "Backed up existing: $script_name → ${target}.bak"
+    fi
+
+    # Create symlink
+    sudo ln -sf "$script" "$target" && success "Linked: $script_name → $target" || {
+      warning "Failed to link $script_name"
+      continue
+    }
+  done
+
+  # Refresh PATH (for current session)
+  hash -r
+}
+
+# === Main Execution ===
+main() {
+  # Check for sudo privileges early
+  if ! sudo -v; then
+    error "This script requires sudo privileges"
+    exit 1
+  fi
+
+  clone_dotfiles || exit 1
+  install_system_binaries || exit 1
+
+  success "Dotfiles installation complete!"
+}
+
+main "$@"
