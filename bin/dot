@@ -24,7 +24,7 @@ displayUsageAndExit() {
   info "Options:"
   info "  -h, --help    Show this help message and exit"
   info "  update        Update dotfiles"
-  exit
+  exit 1
 }
 
 # === Clone Dotfiles ===
@@ -127,7 +127,12 @@ main() {
     exec sudo "$0" "$@"
   fi
 
-  case "$1" in
+  # Handle no arguments case
+  if [[ $# -eq 0 ]]; then
+    displayUsageAndExit
+  fi
+
+  case "${1:-}" in
   "-h" | "--help")
     displayUsageAndExit
     ;;
@@ -136,7 +141,8 @@ main() {
     install_system_binaries
     ;;
   *)
-    error "Invalid option: $1" displayUsageAndExit
+    error "Invalid option: $1"
+    displayUsageAndExit
     ;;
   esac
   shift
@@ -144,6 +150,5 @@ main() {
 
 # Run if script is executed directly
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
-  set -eo pipefail
   main "$@"
 fi
