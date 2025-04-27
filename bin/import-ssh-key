@@ -15,15 +15,27 @@ cleanup() {
     log_message "Cleaned up temporary files"
 }
 
+# Function to get user's home directory properly
+get_user_home() {
+    local username="$1"
+    if [ "$username" == "root" ]; then
+        echo "/root"
+    else
+        eval echo ~"$username"
+    fi
+}
+
 # Function to import keys from GitHub
 import_github_keys() {
     local github_username="$1"
     local target_user="$2"
-    local ssh_dir="/home/$target_user/.ssh"
+    local user_home=$(get_user_home "$target_user")
+    local ssh_dir="$user_home/.ssh"
     local authorized_keys="$ssh_dir/authorized_keys"
     local api_url="https://api.github.com/users/$github_username/keys"
 
     log_message "Starting SSH key import for GitHub user: $github_username → System user: $target_user"
+    log_message "Target SSH directory: $ssh_dir"
 
     # Check if running as root when modifying other users
     if [ "$target_user" != "$(whoami)" ] && [ "$(id -u)" -ne 0 ]; then
