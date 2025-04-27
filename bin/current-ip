@@ -1,6 +1,25 @@
 #!/usr/bin/env bash
 # current-ip - Prints your current public IP address
 
+VERBOSE=false
+
+DOTFILES_ROOT="/usr/local/share/dotfiles-system"
+source "${DOTFILES_ROOT}/system/scripts/logging.sh"
+
+# Parse command line arguments
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        -v|--verbose)
+            VERBOSE=true
+            shift
+            ;;
+        *)
+            info "Usage: $0 [-v|--verbose]" >&2
+            exit 1
+            ;;
+    esac
+done
+
 # Try multiple IP services in case one is down
 IP_SERVICES=(
     "https://ipinfo.io/ip"
@@ -11,13 +30,27 @@ IP_SERVICES=(
 
 # Try each service until we get a response
 for service in "${IP_SERVICES[@]}"; do
-    if ip=$(curl -s --connect-timeout 3 "$service"); then
+    if $VERBOSE; then
+        info "Trying service: $service"
+    fi
+
+    if ip=$(curl -s --connect-timeout 3 "$service" 2>/dev/null); then
+        if $VERBOSE; then
+            info "Received response: $ip"
+        fi
+
         if [[ "$ip" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            if $VERBOSE; then
+                info "Valid IP address found: $ip"
+            fi
             echo "$ip"
             exit 0
+        elif $VERBOSE; then
+            warn "Invalid IP format received: $ip"
         fi
+    elif $VERBOSE; then
+        warn "Service failed: $service"
     fi
 done
 
-echo "Error: Could not determine public IP address" >&2
-exit 1
+error "Could not determine public IP address"

@@ -13,8 +13,6 @@ DOTFILES_SYSTEM_DIR="/usr/local/share/dotfiles-system"
 SYSTEM_CONFIG_DIR="$DOTFILES_SYSTEM_DIR/system" # Where system configs will be stored
 SYSTEM_BIN_SOURCE="$DOTFILES_SYSTEM_DIR/bin"
 GLOBAL_BIN_TARGET="/usr/local/bin" # System-wide binary location
-TOPICS_DIR="$SYSTEM_CONFIG_DIR/topics"
-OPTIONAL_TOPICS_DIR="$SYSTEM_CONFIG_DIR/optional-topics"
 
 displayUsageAndExit() {
   info "dot -- dotfiles management"
