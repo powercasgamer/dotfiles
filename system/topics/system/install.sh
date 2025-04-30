@@ -27,6 +27,7 @@ function speedup_apt() {
     "curl"
     "wget"
     "git"
+    "deborphan"
   )
 
   apt install -y "${packages[@]}"

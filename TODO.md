@@ -10,3 +10,10 @@
 [ ] add a 'dot' binary which basically does what `system.sh` does
 [ ] add a `maintenance` binary which does maintenance on the machine like updates etc.
 [ ] setup fail2ban properly
+
+
+
+
+
+https://github.com/rudisimo/dotfiles-zsh/blob/master/config/zsh/.zshrc
+https://github.com/arithran/dotfiles/blob/master/.zshrc
