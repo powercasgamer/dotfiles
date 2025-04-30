@@ -1,89 +1,193 @@
 #!/usr/bin/env bash
 
-source "${DOTFILES_ROOT}/system/scripts/logging.sh"
-
-# Function to perform apt maintenance
-function apt_maintenance() {
-  # Prevent removal of critical drivers (like graphics and essential hardware)
-  local critical_packages=$(dpkg-query -l | grep -E 'nvidia|amd|mesa|xorg|firmware' | awk '{print $2}')
-
-  # Hold critical drivers to prevent removal/upgrade
-  for pkg in $critical_packages; do
-    apt-mark hold $pkg
-  done
-
-  # Prompt the user for maintenance choices
-  echo "Select maintenance tasks to run:"
-  echo "1. Update package list"
-  echo "2. Upgrade installed packages"
-  echo "3. Perform distribution upgrade"
-  echo "4. Clean orphaned packages"
-  echo "5. Remove unnecessary packages"
-  echo "6. Clean apt cache"
-  echo "7. Perform all tasks"
-  read -p "Enter the number(s) (comma-separated for multiple tasks, e.g., 1,3,5): " tasks
-
-  # Process selected tasks
-  IFS=',' read -r -a selected_tasks <<<"$tasks"
-
-  for task in "${selected_tasks[@]}"; do
-    case $task in
-    1)
-      echo "Updating package list..."
-      apt update
-      ;;
-    2)
-      echo "Upgrading installed packages..."
-      apt upgrade -y
-      ;;
-    3)
-      echo "Performing distribution upgrade..."
-      apt dist-upgrade -y
-      ;;
-    4)
-      echo "Cleaning orphaned packages..."
-      deborphan | xargs sudo apt-get remove --purge -y
-      ;;
-    5)
-      echo "Removing unnecessary packages..."
-      apt autoremove -y
-      ;;
-    6)
-      echo "Cleaning apt cache..."
-      apt autoclean
-      apt clean
-      ;;
-    7)
-      echo "Performing all tasks..."
-      apt update
-      apt upgrade -y
-      apt dist-upgrade -y
-      deborphan | xargs sudo apt-get remove --purge -y
-      apt autoremove -y
-      apt autoclean
-      apt clean
-      ;;
-    *)
-      echo "Invalid selection: $task"
-      ;;
-    esac
-  done
-
-  # Unhold critical drivers to allow future upgrades if necessary (optional)
-  for pkg in $critical_packages; do
-    apt-mark unhold $pkg
-  done
+# Load logging utilities
+DOTFILES_ROOT="/usr/local/share/dotfiles-system"
+source "${DOTFILES_ROOT}/system/scripts/logging.sh" 2>/dev/null || {
+  echo "Error: Failed to load logging utilities" >&2
+  exit 1
 }
 
-# Main function to ask the user if they want to run apt maintenance
-function main() {
-  # Ask if the user wants to run apt maintenance
-  if confirm "Do you want to run apt maintenance?"; then
-    apt_maintenance
-  else
-    info "↷ Skipping apt maintenance."
+# --- Configurable Variables ---
+MIN_DISK_SPACE_GB=2  # Minimum disk space required in GB
+REPORT_FILE="/var/log/apt_maintenance_$(date +%Y%m%d).log"
+
+# --- Dynamic Critical Packages Detection ---
+# (Improvement 1: Auto-detect critical packages instead of hardcoding)
+function get_critical_packages() {
+  # Patterns for packages that should NOT be auto-removed/upgraded blindly
+  local patterns=(
+    'nvidia'
+    'mesa'
+    'xorg'
+    'firmware'
+    'linux-image'
+    'linux-headers'
+    'grub'
+    'initramfs'
+  )
+  # Combine into regex: nvidia|mesa|xorg|...
+  local regex=$(IFS='|'; echo "${patterns[*]}")
+
+  # Get installed packages matching patterns
+  dpkg -l | awk -v regex="$regex" '$2 ~ regex && $1 == "ii" {print $2}' | sort -u
+}
+
+# --- Helper Functions ---
+function check_disk_space() {
+  local avail_kb=$(df --output=avail / | tail -1)
+  local min_kb=$((MIN_DISK_SPACE_GB * 1024 * 1024))
+
+  if [[ $avail_kb -lt $min_kb ]]; then
+    error "Insufficient disk space (min ${MIN_DISK_SPACE_GB}GB required)"
+    return 1
   fi
 }
 
-# Run the main function
+function check_broken_packages() {
+  if dpkg -l | grep -q '^iF'; then
+    error "Broken packages detected. Run 'apt --fix-broken install' first."
+    return 1
+  fi
+}
+
+function hold_packages() {
+  local packages=("$@")
+  for pkg in "${packages[@]}"; do
+    if dpkg -l "$pkg" &>/dev/null; then
+      apt-mark hold "$pkg" || warning "Could not hold $pkg (might not exist)"
+    fi
+  done
+}
+
+function unhold_packages() {
+  local packages=("$@")
+  for pkg in "${packages[@]}"; do
+    apt-mark unhold "$pkg" 2>/dev/null
+  done
+}
+
+function generate_report() {
+  local upgraded=$(apt list --upgradable 2>/dev/null | wc -l)
+  local orphans=$(deborphan | wc -l)
+  local old_kernels=$(dpkg -l | grep '^ii.*linux-image-' | grep -v $(uname -r) | wc -l)
+
+  {
+    info "=== APT Maintenance Report ==="
+    info "- Date: $(date)"
+    info "- Upgraded Packages: $upgraded"
+    info "- Removed Orphans: $orphans"
+    info "- Old Kernels Purged: $old_kernels"
+    info "- Critical Packages Protected: ${#CRITICAL_PACKAGES[@]}"
+  } > "$REPORT_FILE"
+  success "Full report saved to $REPORT_FILE"
+}
+
+# --- Main Maintenance Function ---
+function apt_maintenance() {
+  # Pre-flight checks
+  [[ "$EUID" -ne 0 ]] && { error "Run as root"; return 1; }
+  check_disk_space || return 1
+  check_broken_packages || return 1
+
+  # Get critical packages dynamically (Improvement 1)
+  CRITICAL_PACKAGES=($(get_critical_packages))
+  hold_packages "${CRITICAL_PACKAGES[@]}"
+
+  # Task menu (Improvement 6: Show upgradable packages first)
+  echo "┌─────────────────────────────────┐"
+  echo "│ APT Maintenance Tasks          │"
+  echo "├─────────────────────────────────┤"
+  echo "│ 1. Update package list         │"
+  echo "│ 2. Upgrade packages            │"
+  echo "│ 3. Distribution upgrade        │"
+  echo "│ 4. Remove orphaned packages    │"
+  echo "│ 5. Autoremove unnecessary pkgs │"
+  echo "│ 6. Clean APT cache             │"
+  echo "│ 7. Remove old kernels          │"
+  echo "│ 8. Run ALL tasks               │"
+  echo "└─────────────────────────────────┘"
+
+  # Show upgradable packages if available (Improvement 6)
+  if apt list --upgradable 2>/dev/null | grep -q upgradable; then
+    info "Packages ready for upgrade:"
+    apt list --upgradable
+    echo ""
+  fi
+
+  read -p "Enter task numbers (e.g., 1,2,5): " tasks
+
+  # Process tasks
+  IFS=',' read -r -a selected_tasks <<< "$tasks"
+  for task in "${selected_tasks[@]}"; do
+    task="${task// /}"
+    case "$task" in
+      1) run_task "Updating package list..." "apt update -q=2" ;;
+      2) run_task "Upgrading packages..." "apt upgrade -y -q=2" ;;
+      3) run_task "Distribution upgrade..." "apt dist-upgrade -y -q=2" ;;
+      4) run_task "Removing orphans..." "deborphan | xargs -r apt purge -y --" ;;
+      5) run_task "Autoremoving packages..." "apt autoremove -y" ;;
+      6) run_task "Cleaning cache..." "apt autoclean && apt clean" ;;
+      7) remove_old_kernels ;;
+      8) run_all_tasks ;;
+      *) error "Invalid task: $task" ;;
+    esac
+  done
+
+  # Cleanup and report
+  unhold_packages "${CRITICAL_PACKAGES[@]}"
+  generate_report
+}
+
+# --- Task Runners ---
+function run_task() {
+  local msg="$1"
+  local cmd="$2"
+  step "$msg"
+  eval "$cmd" || error "Task failed: $cmd"
+}
+
+function remove_old_kernels() {
+  step "Removing old kernels..."
+  local current_kernel=$(uname -r)
+  local kernels_to_remove=($(dpkg -l | awk '/^ii linux-image-/{print $2}' | grep -v "$current_kernel"))
+
+  if [[ ${#kernels_to_remove[@]} -eq 0 ]]; then
+    info "No old kernels found (current: $current_kernel)"
+    return
+  fi
+
+  info "Found ${#kernels_to_remove[@]} old kernels:"
+  printf " - %s\n" "${kernels_to_remove[@]}"
+
+  if confirm "Remove these kernels?"; then
+    apt purge -y "${kernels_to_remove[@]}" || error "Kernel removal failed"
+  fi
+}
+
+function run_all_tasks() {
+  local tasks=(
+    "apt update -q=2"
+    "apt upgrade -y -q=2"
+    "apt dist-upgrade -y -q=2"
+    "deborphan | xargs -r apt purge -y --"
+    "apt autoremove -y"
+    "apt autoclean && apt clean"
+  )
+
+  for cmd in "${tasks[@]}"; do
+    run_task "Running: $cmd" "$cmd"
+  done
+  remove_old_kernels
+}
+
+# --- Main ---
+function main() {
+  if confirm "Run APT maintenance?"; then
+    apt_maintenance
+  else
+    info "Operation cancelled."
+  fi
+}
+
+trap 'unhold_packages "${CRITICAL_PACKAGES[@]}"' EXIT
 main

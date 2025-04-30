@@ -20,7 +20,7 @@ function paste() {
   local file="$1"
   local lang="${2:-}"
   local content_type="text/plain"
-  local filename extension
+  local filename extension shebang
 
   # Validate file exists and is readable
   if [[ ! -f "$file" ]] || [[ ! -r "$file" ]]; then
@@ -36,33 +36,44 @@ function paste() {
   # Language to content-type mapping
   declare -A lang_map=(
     ['log']='log'
-    ['sh']='shell'
-    ['bash']='shell'
-    ['zsh']='shell'
-    ['js']='javascript'
-    ['ts']='typescript'
+    ['txt']='plain'
+    ['sh']='shell' ['bash']='shell' ['zsh']='shell'
+    ['js']='javascript' ['mjs']='javascript'
+    ['ts']='typescript' ['mts']='typescript'
     ['py']='python'
     ['java']='java'
-    ['kt']='kotlin'
-    ['kts']='kotlin'
+    ['kt']='kotlin' ['kts']='kotlin'
     ['go']='go'
     ['rs']='rust'
     ['rb']='ruby'
     ['php']='php'
     ['pl']='perl'
     ['json']='json'
-    ['html']='html'
+    ['html']='html' ['htm']='html'
     ['css']='css'
     ['md']='markdown'
     ['xml']='xml'
-    ['yml']='yaml'
-    ['yaml']='yaml'
-    ['c']='c'
-    ['cpp']='cpp'
-    ['h']='c'
-    ['hpp']='cpp'
+    ['yml']='yaml' ['yaml']='yaml'
+    ['c']='c' ['h']='c'
+    ['cpp']='cpp' ['hpp']='cpp' ['cc']='cpp' ['cxx']='cpp'
     ['cs']='csharp'
+    ['sql']='sql'
+    ['toml']='toml'
+    ['ini']='ini'
   )
+
+  # Detect language from shebang if no lang provided
+  if [[ -z "$lang" && "$file" != "-" ]]; then
+    read -r shebang < "$file"
+    case "$shebang" in
+      *python*) lang="python" ;;
+      *bash*)   lang="shell" ;;
+      *sh*)     lang="shell" ;;
+      *node*)   lang="javascript" ;;
+      *ruby*)  lang="ruby" ;;
+      *perl*)   lang="perl" ;;
+    esac
+  fi
 
   # Set content-type
   if [[ -z "$lang" ]]; then
@@ -73,10 +84,15 @@ function paste() {
   # Upload message
   step "Uploading ${filename} (${content_type})"
 
-  # Execute curl
+  # Execute curl (support stdin if file is "-")
   local response
-  response=$(curl -fsS -T "$file" -H "Content-Type: $content_type" \
-    https://api.pastes.dev/post 2>&1)
+  if [[ "$file" == "-" ]]; then
+    response=$(curl -fsS -T - -H "Content-Type: $content_type" \
+      https://api.pastes.dev/post 2>&1)
+  else
+    response=$(curl -fsS -T "$file" -H "Content-Type: $content_type" \
+      https://api.pastes.dev/post 2>&1)
+  fi
 
   local ret=$?
   if [[ $ret -ne 0 ]]; then
