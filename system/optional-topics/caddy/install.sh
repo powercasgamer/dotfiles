@@ -1,16 +1,35 @@
 #!/usr/bin/env bash
-# Latest Caddy 2 Installer with xcaddy
+# Latest Caddy 2 Installer with xcaddy and config template support
 set -euo pipefail
 
 # Configuration
 INSTALL_DIR="/usr/local/bin"
 XCADDY_DIR="/opt/xcaddy-build"
+CADDY_CONFIG_DIR="/etc/caddy"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+CADDY_TEMPLATE="${SCRIPT_DIR}/Caddyfile"
 
 # Colorized output
 function info() { echo -e "\033[34m[INFO]\033[0m $*"; }
 function success() { echo -e "\033[32m[✓]\033[0m $*"; }
 function warning() { echo -e "\033[33m[!]\033[0m $*"; }
 function error() { echo -e "\033[31m[✗]\033[0m $*" >&2; exit 1; }
+
+# ==================== CONFIG TEMPLATE ====================
+function setup_config() {
+  info "Setting up Caddy configuration..."
+
+  if [[ ! -f "$CADDY_TEMPLATE" ]]; then
+    error "Caddyfile template not found at $CADDY_TEMPLATE"
+  fi
+
+  mkdir -p "$CADDY_CONFIG_DIR"
+  cp "$CADDY_TEMPLATE" "$CADDY_CONFIG_DIR/Caddyfile"
+  chown -R caddy:caddy "$CADDY_CONFIG_DIR"
+  chmod 644 "$CADDY_CONFIG_DIR/Caddyfile"
+
+  success "Caddyfile configured at $CADDY_CONFIG_DIR/Caddyfile"
+}
 
 # ==================== LATEST VERSION DETECTION ====================
 function get_latest_go() {
@@ -63,24 +82,19 @@ function install_go() {
   rm -rf /usr/local/go
   tar -C /usr/local -xzf "$go_tar"
 
-  # Add to PATH if not present
   setup_go_path
-
   success "Go ${GO_VERSION} installed"
 }
 
 function setup_go_path() {
-  # Add to /etc/profile (Bash)
   if ! grep -q "/usr/local/go/bin" /etc/profile; then
     echo 'export PATH=$PATH:/usr/local/go/bin' >> /etc/profile
   fi
 
-  # Add to /etc/zsh/zprofile (Zsh)
   if [[ -f /etc/zsh/zprofile ]] && ! grep -q "/usr/local/go/bin" /etc/zsh/zprofile; then
     echo 'export PATH=$PATH:/usr/local/go/bin' >> /etc/zsh/zprofile
   fi
 
-  # Apply to current session
   export PATH=$PATH:/usr/local/go/bin
 }
 
@@ -93,15 +107,11 @@ function build_caddy() {
   export GOBIN="$GOPATH/bin"
   mkdir -p "$GOPATH"
 
-  # Install latest xcaddy
   go install github.com/caddyserver/xcaddy/cmd/xcaddy@latest
 
-  # Build Caddy with common plugins
   local plugins=(
     "github.com/caddy-dns/cloudflare"
     "github.com/enum-gg/caddy-discord"
-#    "github.com/caddyserver/forwardproxy@latest"
-#    "github.com/greenpau/caddy-security@latest"
   )
 
   local build_cmd=("$GOBIN/xcaddy" build "v${CADDY_VERSION}")
@@ -113,10 +123,8 @@ function build_caddy() {
     error "Failed to build Caddy"
   fi
 
-  # Install to system
   mv caddy "$INSTALL_DIR"
   setcap 'cap_net_bind_service=+ep' "$INSTALL_DIR/caddy"
-
   success "Caddy ${CADDY_VERSION} built with plugins"
 }
 
@@ -124,7 +132,11 @@ function build_caddy() {
 function configure_service() {
   info "Configuring Caddy systemd service..."
 
-  cat <<EOF | tee /etc/systemd/system/caddy.service >/dev/null
+  if ! id caddy &>/dev/null; then
+    useradd --system --shell /usr/sbin/nologin --home-dir /etc/caddy caddy
+  fi
+
+  cat > /etc/systemd/system/caddy.service << 'EOL'
 [Unit]
 Description=Caddy 2
 Documentation=https://caddyserver.com/docs/
@@ -133,8 +145,8 @@ After=network.target
 [Service]
 User=caddy
 Group=caddy
-ExecStart=$INSTALL_DIR/caddy run --environ --config /etc/caddy/Caddyfile
-ExecReload=$INSTALL_DIR/caddy reload --config /etc/caddy/Caddyfile
+ExecStart=/usr/local/bin/caddy run --environ --config /etc/caddy/Caddyfile
+ExecReload=/usr/local/bin/caddy reload --config /etc/caddy/Caddyfile
 TimeoutStopSec=5s
 LimitNOFILE=1048576
 LimitNPROC=512
@@ -144,20 +156,10 @@ AmbientCapabilities=CAP_NET_BIND_SERVICE
 
 [Install]
 WantedBy=multi-user.target
-EOF
-
-  # Create user and directories
-  if ! id caddy &>/dev/null; then
-    useradd --system --shell /usr/sbin/nologin --home-dir /etc/caddy caddy
-  fi
-  usermod -aG www-data caddy
-
-  mkdir -p /etc/caddy
-  chown -R caddy:caddy /etc/caddy
+EOL
 
   systemctl daemon-reload
   systemctl enable --now caddy
-
   success "Caddy service configured"
 }
 
@@ -166,6 +168,7 @@ function main() {
   check_requirements
   install_go
   build_caddy
+  setup_config
   configure_service
 
   success "Installation complete!"
@@ -174,7 +177,7 @@ function main() {
   /usr/local/bin/caddy version
 
   echo -e "\nNext steps:"
-  echo "1. Edit config: /etc/caddy/Caddyfile"
+  echo "1. Verify config: $CADDY_CONFIG_DIR/Caddyfile"
   echo "2. Check status: systemctl status caddy"
   echo "3. Test: curl -I http://localhost"
 }

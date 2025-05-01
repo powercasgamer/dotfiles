@@ -89,9 +89,7 @@
     }
 }
 
-
-
-        # Example domain configuration
+# Example domain configuration
 example.com {
     import defaults
 
