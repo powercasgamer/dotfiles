@@ -109,13 +109,12 @@ example.com {
         root * /var/www/example.com
         file_server {
             index index.html
-            browse  # Enable directory listing (disable for production)
         }
 
         # PHP backend (example)
         @php path *.php
         handle @php {
-            reverse_proxy unix//run/php/php8.2-fpm.sock
+            reverse_proxy unix//run/php/php8.4-fpm.sock
         }
     }
 }

@@ -150,6 +150,7 @@ EOF
   if ! id caddy &>/dev/null; then
     useradd --system --shell /usr/sbin/nologin --home-dir /etc/caddy caddy
   fi
+  usermod -aG www-data caddy
 
   mkdir -p /etc/caddy
   chown -R caddy:caddy /etc/caddy
