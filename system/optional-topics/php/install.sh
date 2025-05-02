@@ -7,7 +7,6 @@ DOTFILES_ROOT="/usr/local/share/dotfiles-system"
 source "${DOTFILES_ROOT}/system/scripts/logging.sh"
 
 # ==================== CONFIGURATION ====================
-# Your explicitly requested extensions
 REQUIRED_EXTENSIONS=(
   "cli"
   "openssl"
@@ -24,7 +23,6 @@ REQUIRED_EXTENSIONS=(
   "fpm"
 )
 
-# Additional recommended extensions (from previous version)
 RECOMMENDED_EXTENSIONS=(
   "opcache"
   "fileinfo"

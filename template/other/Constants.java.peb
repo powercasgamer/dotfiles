@@ -1,0 +1,17 @@
+package {{location}};
+
+public final class Constants {
+    public static final String VERSION = "{{ version }}";
+    public static final String GIT_BRANCH = "{{ git_branch }}";
+    public static final String GIT_COMMIT = "{{ git_commit }}";
+    public static final String GIT_URL = "{{ git_url }}";
+    public static final String GIT_USER = "{{ git_user }}";
+    public static final String GIT_REPO = "{{ git_repo }}";
+    public static final String AUTHOR = "{{ author }}";
+    public static final String DESCRIPTION = "{{ description }}";
+    public static final String NAME = "{{ name }}";
+    public static final String URL = "{{ url }}";
+
+    private Constants() {
+    }
+}

@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+show_help() {
+  cat <<EOF
+Usage: $(basename "$0") [OPTIONS] <location>
+Create a new Java constants file
+
+Options:
+  -p, --package   Specify package name (default: com.example.<module-name>.constants.Constants)
+  -h, --help      Show this help message
+
+Example:
+  $(basename "$0") -p com.myapp my-module
+EOF
+}
+
+# Initialize variables
+PACKAGE=""
