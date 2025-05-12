@@ -7,3 +7,6 @@ https://github.com/sharkdp/bat
 https://github.com/zyedidia/micro
 
 https://neovim.io/
+
+credits:
+- ai
