@@ -36,10 +36,18 @@ success "Detected Tailscale IP: $TAILSCALE_IP"
 
 # Prompt for CA password (handle unset vars)
 step "Setting up TLS certificates..."
-read -sp "Enter password for CA certificate: " CA_PASSWORD
-echo
-read -sp "Confirm password: " CA_PASSWORD_CONFIRM
-echo
+while true; do
+  read -sp "Enter password for CA certificate: " CA_PASSWORD
+  echo  # Add newline after input
+  read -sp "Confirm password: " CA_PASSWORD_CONFIRM
+  echo  # Add newline after input
+
+  if [ -n "$CA_PASSWORD" ] && [ "$CA_PASSWORD" = "$CA_PASSWORD_CONFIRM" ]; then
+    break
+  else
+    error "Passwords do not match or are empty. Please try again."
+  fi
+done
 
 if [ "$CA_PASSWORD" != "$CA_PASSWORD_CONFIRM" ]; then
   error "Passwords do not match!"
