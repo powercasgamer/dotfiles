@@ -34,24 +34,37 @@ if [ -z "$TAILSCALE_IP" ]; then
 fi
 success "Detected Tailscale IP: $TAILSCALE_IP"
 
-# Prompt for CA password (handle unset vars)
+# Prompt for CA password
 step "Setting up TLS certificates..."
 while true; do
-  read -sp "Enter password for CA certificate: " CA_PASSWORD
-  echo  # Add newline after input
-  read -sp "Confirm password: " CA_PASSWORD_CONFIRM
-  echo  # Add newline after input
+    # First password entry
+    while true; do
+        echo -n "Enter password for CA certificate: "
+        stty -echo  # Disable echo
+        read -r CA_PASSWORD
+        stty echo   # Re-enable echo
+        echo
 
-  if [ -n "$CA_PASSWORD" ] && [ "$CA_PASSWORD" = "$CA_PASSWORD_CONFIRM" ]; then
-    break
-  else
-    error "Passwords do not match or are empty. Please try again."
-  fi
+        if [ -z "$CA_PASSWORD" ]; then
+            warning "Password cannot be empty. Please try again."
+        else
+            break
+        fi
+    done
+
+    # Password confirmation
+    echo -n "Confirm password: "
+    stty -echo
+    read -r CA_PASSWORD_CONFIRM
+    stty echo
+    echo
+
+    if [ "$CA_PASSWORD" != "$CA_PASSWORD_CONFIRM" ]; then
+        warning "Passwords do not match! Please try again."
+    else
+        break
+    fi
 done
-
-if [ "$CA_PASSWORD" != "$CA_PASSWORD_CONFIRM" ]; then
-  error "Passwords do not match!"
-fi
 
 # Install dependencies
 if ! command -v openssl &> /dev/null; then
