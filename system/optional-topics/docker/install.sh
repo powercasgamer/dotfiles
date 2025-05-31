@@ -50,11 +50,11 @@ install_docker_debian() {
     log_info "Installing Docker on Debian-based system"
 
     # Remove old versions
-    log_step "Removing old Docker versions..."
-    apt-get remove -y docker docker-engine docker.io containerd runc || {
-        log_error "Failed to remove old Docker packages"
-        return 1
-    }
+#     log_step "Removing old Docker versions..."
+#     apt-get remove -y docker docker-engine docker.io containerd runc || {
+#         log_error "Failed to remove old Docker packages"
+#         return 1
+#     }
 
     # Install dependencies
     log_step "Installing dependencies..."
