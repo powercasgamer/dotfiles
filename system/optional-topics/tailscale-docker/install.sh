@@ -34,38 +34,6 @@ if [ -z "$TAILSCALE_IP" ]; then
 fi
 success "Detected Tailscale IP: $TAILSCALE_IP"
 
-# Prompt for CA password
-step "Setting up TLS certificates..."
-while true; do
-    # First password entry
-    while true; do
-        echo -n "Enter password for CA certificate: "
-        stty -echo  # Disable echo
-        read -r CA_PASSWORD
-        stty echo   # Re-enable echo
-        echo
-
-        if [ -z "$CA_PASSWORD" ]; then
-            warning "Password cannot be empty. Please try again."
-        else
-            break
-        fi
-    done
-
-    # Password confirmation
-    echo -n "Confirm password: "
-    stty -echo
-    read -r CA_PASSWORD_CONFIRM
-    stty echo
-    echo
-
-    if [ "$CA_PASSWORD" != "$CA_PASSWORD_CONFIRM" ]; then
-        warning "Passwords do not match! Please try again."
-    else
-        break
-    fi
-done
-
 # Install dependencies
 if ! command -v openssl &> /dev/null; then
   info "Installing openssl..."
@@ -79,15 +47,15 @@ if ! command -v openssl &> /dev/null; then
 fi
 
 # Create docker certs directory
-mkdir -p /etc/docker/certs
-cd /etc/docker/certs
+mkdir -p /etc/docker/certs || error "Failed to create certs directory"
+cd /etc/docker/certs || error "Failed to enter certs directory"
 
 # Generate CA
-info "Generating CA certificate..."
-openssl genrsa -aes256 -passout pass:"$CA_PASSWORD" -out ca-key.pem 4096 || {
+info "Generating CA certificate (OpenSSL will prompt for password)..."
+openssl genrsa -aes256 -out ca-key.pem 4096 || {
   error "Failed to generate CA key"
 }
-openssl req -new -x509 -days "$CERT_DAYS" -key ca-key.pem -passin pass:"$CA_PASSWORD" \
+openssl req -new -x509 -days "$CERT_DAYS" -key ca-key.pem \
   -sha256 -out ca.pem -subj "/CN=docker-ca" || {
   error "Failed to generate CA certificate"
 }
@@ -95,12 +63,18 @@ openssl req -new -x509 -days "$CERT_DAYS" -key ca-key.pem -passin pass:"$CA_PASS
 # Generate server key & cert
 info "Generating server certificate..."
 openssl genrsa -out server-key.pem 4096 || error "Failed to generate server key"
-openssl req -subj "/CN=$TAILSCALE_IP" -sha256 -new -key server-key.pem -out server.csr || {
+openssl req -subj "/CN=$TAILSCALE_IP" -sha256 -new \
+  -key server-key.pem -out server.csr || {
   error "Failed to generate server CSR"
 }
-echo "subjectAltName = IP:$TAILSCALE_IP,IP:127.0.0.1" > extfile.cnf
-openssl x509 -req -days "$CERT_DAYS" -sha256 -in server.csr -CA ca.pem -CAkey ca-key.pem \
-  -passin pass:"$CA_PASSWORD" -CAcreateserial -out server-cert.pem -extfile extfile.cnf || {
+
+cat > extfile.cnf <<EOF
+subjectAltName = IP:$TAILSCALE_IP,IP:127.0.0.1
+EOF
+
+openssl x509 -req -days "$CERT_DAYS" -sha256 -in server.csr \
+  -CA ca.pem -CAkey ca-key.pem -CAcreateserial \
+  -out server-cert.pem -extfile extfile.cnf || {
   error "Failed to sign server certificate"
 }
 
@@ -110,19 +84,38 @@ openssl genrsa -out key.pem 4096 || error "Failed to generate client key"
 openssl req -subj '/CN=client' -new -key key.pem -out client.csr || {
   error "Failed to generate client CSR"
 }
-echo "extendedKeyUsage = clientAuth" > extfile-client.cnf
-openssl x509 -req -days "$CERT_DAYS" -sha256 -in client.csr -CA ca.pem -CAkey ca-key.pem \
-  -passin pass:"$CA_PASSWORD" -CAcreateserial -out cert.pem -extfile extfile-client.cnf || {
+
+cat > extfile-client.cnf <<EOF
+extendedKeyUsage = clientAuth
+EOF
+
+openssl x509 -req -days "$CERT_DAYS" -sha256 -in client.csr \
+  -CA ca.pem -CAkey ca-key.pem -CAcreateserial \
+  -out cert.pem -extfile extfile-client.cnf || {
   error "Failed to sign client certificate"
 }
 
 # Set permissions
-chmod 0400 ca-key.pem key.pem server-key.pem || warning "Failed to set restrictive permissions"
-chmod 0444 ca.pem server-cert.pem cert.pem || warning "Failed to set read permissions"
+info "Setting secure file permissions..."
+chmod 0400 ca-key.pem key.pem server-key.pem || {
+  warning "Failed to set restrictive permissions - check manually"
+}
+chmod 0444 ca.pem server-cert.pem cert.pem || {
+  warning "Failed to set read permissions - check manually"
+}
 
-# Cleanup
-rm -f client.csr server.csr extfile.cnf extfile-client.cnf ca.srl || warning "Cleanup skipped or partial"
+# Cleanup temporary files
+info "Cleaning up temporary files..."
+rm -f client.csr server.csr extfile.cnf extfile-client.cnf ca.srl 2>/dev/null || {
+  warning "Failed to clean up some temporary files"
+}
 
+# Verify certificates
+info "Verifying certificate chain..."
+openssl verify -CAfile ca.pem server-cert.pem cert.pem >/dev/null 2>&1 || {
+  error "Certificate verification failed"
+}
+success "All certificates generated and verified successfully"
 # Configure Docker
 step "Configuring Docker daemon..."
 cat > /etc/docker/daemon.json <<EOF
