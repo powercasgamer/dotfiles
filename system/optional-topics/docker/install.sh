@@ -45,19 +45,20 @@ fi
 
 log_info "Detected OS: $OS $VER"
 
+adjust_repo_for_ubuntu_noble() {
+    if [[ "$OS" == "Ubuntu" && "$VER" == "24.04" ]]; then
+        if ! curl -s --head https://download.docker.com/linux/ubuntu/dists/noble/ >/dev/null; then
+            warning "Ubuntu 24.04 (Noble) not yet in Docker repo - falling back to Jammy (22.04)"
+            sed -i 's/noble/jammy/g' /etc/apt/sources.list.d/docker.list
+        fi
+    fi
+}
+
 # Installation functions
 install_docker_debian() {
     log_info "Installing Docker on Debian-based system"
 
-    # Remove old versions
-#     log_step "Removing old Docker versions..."
-#     apt-get remove -y docker docker-engine docker.io containerd runc || {
-#         log_error "Failed to remove old Docker packages"
-#         return 1
-#     }
-
     # Install dependencies
-    log_step "Installing dependencies..."
     apt-get update && apt-get install -y \
         ca-certificates \
         curl \
@@ -68,24 +69,24 @@ install_docker_debian() {
     }
 
     # Add Docker GPG key
-    log_step "Adding Docker GPG key..."
     mkdir -p /etc/apt/keyrings
-    curl -fsSL https://download.docker.com/linux/debian/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg || {
+    curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg || {
         log_error "Failed to add Docker GPG key"
         return 1
     }
 
-    # Set up repository (always use stable channel)
-    log_step "Setting up Docker repository..."
-    echo \
-      "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/debian \
-      $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null || {
+    # Set up repository
+    echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] \
+    https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | \
+    tee /etc/apt/sources.list.d/docker.list >/dev/null || {
         log_error "Failed to set up Docker repository"
         return 1
     }
 
-    # Install Docker (will get latest from repo)
-    log_step "Installing Docker Engine..."
+    # Adjust for Ubuntu Noble if needed
+    adjust_repo_for_ubuntu_noble
+
+    # Install Docker
     apt-get update && apt-get install -y \
         docker-ce \
         docker-ce-cli \
