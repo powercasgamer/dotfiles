@@ -36,12 +36,10 @@ success "Detected Tailscale IP: $TAILSCALE_IP"
 
 # Prompt for CA password (handle unset vars)
 step "Setting up TLS certificates..."
-set +u
 read -sp "Enter password for CA certificate: " CA_PASSWORD
 echo
 read -sp "Confirm password: " CA_PASSWORD_CONFIRM
 echo
-set -u
 
 if [ "$CA_PASSWORD" != "$CA_PASSWORD_CONFIRM" ]; then
   error "Passwords do not match!"
