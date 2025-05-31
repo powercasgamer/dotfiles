@@ -218,17 +218,22 @@ post_install() {
         return 1
     }
 
-    # Add current user to docker group
-    if [ -n "$SUDO_USER" ]; then
-        log_step "Adding $SUDO_USER to docker group..."
-        usermod -aG docker "$SUDO_USER" || {
-            log_warning "Failed to add user to docker group"
+# Add current user to docker group
+DOCKER_USER="${SUDO_USER:-$(logname 2>/dev/null || echo "${USER}")}"
+if [ -n "$DOCKER_USER" ] && [ "$DOCKER_USER" != "root" ]; then
+    step "Adding $DOCKER_USER to docker group..."
+    if id "$DOCKER_USER" >/dev/null 2>&1; then
+        usermod -aG docker "$DOCKER_USER" || {
+            warning "Failed to add user to docker group"
         }
-        log_info "You'll need to log out and back in for group changes to take effect"
+        info "You'll need to log out and back in for group changes to take effect"
+    else
+        warningrning "User $DOCKER_USER does not exist - cannot add to docker group"
     fi
+fi
 
     # Show versions
-    log_step "Installed versions:"
+    step "Installed versions:"
     docker --version
     docker compose version
     if [ -f /usr/local/bin/docker-compose ]; then
