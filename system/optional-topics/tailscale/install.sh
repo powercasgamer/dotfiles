@@ -85,7 +85,7 @@ function main() {
   configure_ufw
 
   info "Restarting SSH service..."
-  systemctl restart sshd
+  systemctl restart ssh
 
   success "Tailscale installed with SSH port locked to Tailscale network"
   echo -e "\nTo check:"
