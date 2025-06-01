@@ -17,6 +17,10 @@ function success() {
   echo -e "${GREEN}[✓]${NC} $*"
 }
 
+function warn() {
+    echo -e "${YELLOW}[!]${NC} $*"
+}
+
 function warning() {
   echo -e "${YELLOW}[!]${NC} $*" >&2
 }
