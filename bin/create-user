@@ -99,18 +99,30 @@ import_github_keys() {
   local api_url="https://api.github.com/users/$github_username/keys"
 
   info "Fetching SSH keys from GitHub for user: $github_username"
-  local response=$(curl -s "$api_url")
+  local response
+  response=$(curl -s "$api_url")
+  if [ $? -ne 0 ]; then
+    error "Failed to fetch data from GitHub API."
+    rm -f "$temp_file"
+    return 1
+  fi
 
   if [[ "$response" == *"Not Found"* ]]; then
     error "GitHub user '$github_username' not found."
+    rm -f "$temp_file"
+    return 1
   fi
 
   if ! echo "$response" | jq -r '.[].key' >"$temp_file" 2>/dev/null; then
     error "Failed to parse GitHub API response."
+    rm -f "$temp_file"
+    return 1
   fi
 
   if [ ! -s "$temp_file" ]; then
     error "No SSH keys found for GitHub user '$github_username'."
+    rm -f "$temp_file"
+    return 1
   fi
 
   info "Fetched $(wc -l <"$temp_file") SSH keys from GitHub"
