@@ -93,46 +93,82 @@ add_to_group() {
     fi
 }
 
+#!/usr/bin/env bash
+
+# Debugging: Uncomment to see script execution flow
+# set -x
+
 import_github_keys() {
   local github_username="$1"
   local temp_file
-  temp_file=$(mktemp) || { error "Failed to create temp file"; return 1; }
-  local api_url="https://api.github.com/users/$github_username/keys"
+  temp_file=$(mktemp "/tmp/github_keys_XXXXXX") || {
+    error "Failed to create temporary file"
+    return 1
+  }
 
   info "Fetching SSH keys from GitHub for user: $github_username"
 
-  # Fetch keys with timeout and proper error handling
-  if ! response=$(curl -s --max-time 10 "$api_url"); then
-    error "Failed to fetch data from GitHub API (curl error)"
-    rm -f "$temp_file"
-    return 1
-  fi
-
-  [ -z "$response" ] && {
-    error "Empty response from GitHub API"
+  # Check GitHub API rate limits first
+  local rate_limit
+  rate_limit=$(curl -s "https://api.github.com/rate_limit") || {
+    error "Failed to check GitHub rate limits"
     rm -f "$temp_file"
     return 1
   }
 
+  local remaining
+  remaining=$(echo "$rate_limit" | jq -r '.resources.core.remaining')
+  if (( remaining < 1 )); then
+    error "GitHub API rate limit exceeded (remaining: $remaining)"
+    rm -f "$temp_file"
+    return 1
+  fi
+
+  # Fetch keys with timeout and proper error handling
+  local response
+  response=$(curl -s --max-time 10 \
+    -H "Accept: application/vnd.github.v3+json" \
+    "https://api.github.com/users/$github_username/keys") || {
+    error "Failed to fetch keys from GitHub (curl error)"
+    rm -f "$temp_file"
+    return 1
+  }
+
+  # Check for empty response
+  if [[ -z "$response" ]]; then
+    error "Received empty response from GitHub API"
+    rm -f "$temp_file"
+    return 1
+  fi
+
+  # Check for API errors
   if [[ "$response" == *"Not Found"* ]]; then
-    error "GitHub user '$github_username' not found."
+    error "GitHub user '$github_username' not found"
     rm -f "$temp_file"
     return 1
   fi
 
-  if ! echo "$response" | jq -r '.[].key' >"$temp_file"; then
-    error "Failed to parse GitHub API response (jq error)"
+  if [[ "$response" == *"rate limit exceeded"* ]]; then
+    error "GitHub API rate limit exceeded"
     rm -f "$temp_file"
     return 1
   fi
 
-  if [ ! -s "$temp_file" ]; then
-    error "No SSH keys found for GitHub user '$github_username'."
+  # Parse keys and handle jq errors
+  if ! echo "$response" | jq -r '.[].key' > "$temp_file" 2>/dev/null; then
+    error "Failed to parse GitHub API response"
     rm -f "$temp_file"
     return 1
   fi
 
-  info "Fetched $(wc -l <"$temp_file") SSH keys from GitHub"
+  # Verify we got actual keys
+  if [[ ! -s "$temp_file" ]]; then
+    error "No SSH keys found for GitHub user '$github_username'"
+    rm -f "$temp_file"
+    return 1
+  fi
+
+  info "Successfully fetched $(wc -l < "$temp_file") SSH keys"
   echo "$temp_file"
 }
 
@@ -144,52 +180,100 @@ setup_ssh_access() {
   local user_ssh_dir="$user_home/.ssh"
 
   info "Setting up SSH access for $username"
-  mkdir -p "$user_ssh_dir" || { error "Failed to create .ssh directory"; return 1; }
+
+  # Create .ssh directory with proper permissions
+  mkdir -p "$user_ssh_dir" || {
+    error "Failed to create .ssh directory"
+    return 1
+  }
 
   case "$key_source" in
-  "github")
-    info "Importing keys from GitHub user: $key_source_value"
-    local key_file
-    key_file=$(import_github_keys "$key_source_value") || return 1
+    "github")
+      info "Attempting to import keys from GitHub user: $key_source_value"
 
-    # Verify the temp file exists and is readable
-    if [ ! -f "$key_file" ] || [ ! -r "$key_file" ]; then
-      error "Temporary key file is invalid or unreadable"
-      [ -f "$key_file" ] && rm -f "$key_file"
-      return 1
-    fi
+      local key_file
+      key_file=$(import_github_keys "$key_source_value") || {
+        error "Failed to import GitHub keys"
+        return 1
+      }
 
-    # Create authorized_keys if it doesn't exist
-    touch "$user_ssh_dir/authorized_keys" || {
+      # Verify the temp file exists and contains keys
+      if [[ ! -f "$key_file" || ! -r "$key_file" ]]; then
+        error "Temporary key file problem (exists: $([[ -f "$key_file" ]] && echo "yes" || echo "no"), readable: $([[ -r "$key_file" ]] && echo "yes" || echo "no"))"
+        [[ -f "$key_file" ]] && rm -f "$key_file"
+        return 1
+      fi
+
+      # Debug: Show the keys we're about to add
+      debug "Keys to be added:"
+      debug "$(cat "$key_file")"
+
+      # Create authorized_keys if it doesn't exist
+      touch "$user_ssh_dir/authorized_keys" || {
+        rm -f "$key_file"
+        error "Failed to create authorized_keys file"
+        return 1
+      }
+
+      # Add header to identify these keys
+      echo "# GitHub keys for $key_source_value" >> "$user_ssh_dir/authorized_keys" || {
+        rm -f "$key_file"
+        error "Failed to write to authorized_keys"
+        return 1
+      }
+
+      # Append new keys
+      cat "$key_file" >> "$user_ssh_dir/authorized_keys" || {
+        rm -f "$key_file"
+        error "Failed to append keys to authorized_keys"
+        return 1
+      }
+
+      # Clean up
       rm -f "$key_file"
-      error "Failed to create authorized_keys"
+
+      info "Successfully imported GitHub SSH keys"
+      ;;
+
+    "local")
+      [[ ! -f "$ALLOWED_KEYS" ]] && {
+        error "SSH keys file not found at $ALLOWED_KEYS"
+        return 1
+      }
+      cp "$ALLOWED_KEYS" "$user_ssh_dir/authorized_keys" || {
+        error "Failed to copy SSH keys"
+        return 1
+      }
+      ;;
+
+    *)
+      error "Invalid SSH key source specified: $key_source"
       return 1
-    }
-
-    # Append new keys
-    if ! cat "$key_file" >> "$user_ssh_dir/authorized_keys"; then
-      rm -f "$key_file"
-      error "Failed to append keys to authorized_keys"
-      return 1
-    fi
-
-    rm -f "$key_file"
-    ;;
-
-  "local")
-    [ ! -f "$ALLOWED_KEYS" ] && { error "SSH keys file not found at $ALLOWED_KEYS"; return 1; }
-    cp "$ALLOWED_KEYS" "$user_ssh_dir/authorized_keys" || { error "Failed to copy SSH keys"; return 1; }
-    ;;
-
-  *)
-    error "Invalid SSH key source specified: $key_source"
-    return 1
-    ;;
+      ;;
   esac
 
-  chown -R "$username:$username" "$user_ssh_dir" || { error "Failed to set .ssh ownership"; return 1; }
-  chmod 700 "$user_ssh_dir" || { error "Failed to set .ssh permissions"; return 1; }
-  chmod 600 "$user_ssh_dir/authorized_keys" || { error "Failed to set authorized_keys permissions"; return 1; }
+  # Set proper permissions
+  chown -R "$username:$username" "$user_ssh_dir" || {
+    error "Failed to set .ssh ownership"
+    return 1
+  }
+  chmod 700 "$user_ssh_dir" || {
+    error "Failed to set .ssh permissions"
+    return 1
+  }
+  chmod 600 "$user_ssh_dir/authorized_keys" || {
+    error "Failed to set authorized_keys permissions"
+    return 1
+  }
+
+  # Final verification
+  [[ -f "$user_ssh_dir/authorized_keys" ]] || {
+    error "authorized_keys file missing after setup"
+    return 1
+  }
+
+  debug "SSH setup complete. Contents of authorized_keys:"
+  debug "$(cat "$user_ssh_dir/authorized_keys")"
 
   return 0
 }

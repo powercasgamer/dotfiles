@@ -35,6 +35,11 @@ function error() {
   exit 1
 }
 
+function debug() {
+# if [[ -n "$DEBUG" ]]; then}
+    echo -e "${BLUE}[DEBUG]${NC} $*"
+#   fi
+}
 function confirm() {
   tput setaf 3
   echo -n "$1 (y/N): "
