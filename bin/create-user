@@ -93,6 +93,37 @@ add_to_group() {
     fi
 }
 
+check_github_api_availability() {
+  local max_retries=3
+  local timeout=5
+  local retry_delay=2
+
+  for ((i=1; i<=max_retries; i++)); do
+    # Use curl with proper error handling and timeout
+    if http_code=$(curl -s -o /dev/null -w "%{http_code}" \
+         -m "$timeout" \
+         -H "Accept: application/vnd.github.v3+json" \
+         "https://api.github.com"); then
+
+      # Check for successful response (200-299 range)
+      if [[ "$http_code" =~ ^2 ]]; then
+        debug "GitHub API available (HTTP $http_code)"
+        return 0
+      else
+        debug "GitHub API returned HTTP $http_code"
+      fi
+    else
+      debug "Curl failed to connect (attempt $i/$max_retries)"
+    fi
+
+    # Exponential backoff
+    sleep $((retry_delay * i))
+  done
+
+  error "Failed to reach GitHub API after $max_retries attempts"
+  return 1
+}
+
 import_github_keys() {
   local github_username="$1"
   local temp_file
@@ -118,10 +149,10 @@ import_github_keys() {
   fi
 
   # Check GitHub API availability
-  if ! curl -s -I "https://api.github.com" | grep -q "200 OK"; then
-    error "❌ GitHub API is unavailable"
+  if ! check_github_api_availability; then
+    warn "❌ GitHub API is unavailable"
     rm -f "$temp_file" &>/dev/null
-    return 1
+    exit 1
   fi
 
   # Check rate limits
