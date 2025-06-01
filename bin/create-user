@@ -95,27 +95,24 @@ add_to_group() {
 
 import_github_keys() {
   local github_username="$1"
-  local temp_file=$(mktemp)
+  local temp_file
+  temp_file=$(mktemp) || { error "Failed to create temp file"; return 1; }
   local api_url="https://api.github.com/users/$github_username/keys"
-  local rate_limit_url="https://api.github.com/rate_limit"
-
-  # Check rate limits first
-  local rate_response=$(curl -s "$rate_limit_url")
-  local remaining=$(echo "$rate_response" | jq -r '.resources.core.remaining')
-  if [ "$remaining" -lt 10 ]; then
-    error "GitHub API rate limit is low ($remaining remaining). Try again later."
-    rm -f "$temp_file"
-    return 1
-  fi
 
   info "Fetching SSH keys from GitHub for user: $github_username"
-  local response
-  response=$(curl -s "$api_url")
-  if [ $? -ne 0 ] || [ -z "$response" ]; then
-    error "Failed to fetch data from GitHub API."
+
+  # Fetch keys with timeout and proper error handling
+  if ! response=$(curl -s --max-time 10 "$api_url"); then
+    error "Failed to fetch data from GitHub API (curl error)"
     rm -f "$temp_file"
     return 1
   fi
+
+  [ -z "$response" ] && {
+    error "Empty response from GitHub API"
+    rm -f "$temp_file"
+    return 1
+  }
 
   if [[ "$response" == *"Not Found"* ]]; then
     error "GitHub user '$github_username' not found."
@@ -123,8 +120,8 @@ import_github_keys() {
     return 1
   fi
 
-  if ! echo "$response" | jq -r '.[].key' >"$temp_file" 2>/dev/null; then
-    error "Failed to parse GitHub API response."
+  if ! echo "$response" | jq -r '.[].key' >"$temp_file"; then
+    error "Failed to parse GitHub API response (jq error)"
     rm -f "$temp_file"
     return 1
   fi
@@ -147,39 +144,54 @@ setup_ssh_access() {
   local user_ssh_dir="$user_home/.ssh"
 
   info "Setting up SSH access for $username"
-  mkdir -p "$user_ssh_dir" || error "Failed to create .ssh directory"
+  mkdir -p "$user_ssh_dir" || { error "Failed to create .ssh directory"; return 1; }
 
   case "$key_source" in
   "github")
+    info "Importing keys from GitHub user: $key_source_value"
     local key_file
-    key_file=$(import_github_keys "$key_source_value") || {
-      error "Failed to import GitHub keys"
+    key_file=$(import_github_keys "$key_source_value") || return 1
+
+    # Verify the temp file exists and is readable
+    if [ ! -f "$key_file" ] || [ ! -r "$key_file" ]; then
+      error "Temporary key file is invalid or unreadable"
+      [ -f "$key_file" ] && rm -f "$key_file"
+      return 1
+    fi
+
+    # Create authorized_keys if it doesn't exist
+    touch "$user_ssh_dir/authorized_keys" || {
+      rm -f "$key_file"
+      error "Failed to create authorized_keys"
       return 1
     }
-    [ ! -f "$key_file" ] && {
-      error "Temporary key file not found"
-      return 1
-    }
-    cat "$key_file" >>"$user_ssh_dir/authorized_keys" || {
+
+    # Append new keys
+    if ! cat "$key_file" >> "$user_ssh_dir/authorized_keys"; then
       rm -f "$key_file"
       error "Failed to append keys to authorized_keys"
       return 1
-    }
+    fi
+
     rm -f "$key_file"
     ;;
+
   "local")
-    [ ! -f "$ALLOWED_KEYS" ] && error "SSH keys file not found at $ALLOWED_KEYS"
-    cp "$ALLOWED_KEYS" "$user_ssh_dir/authorized_keys" || error "Failed to copy SSH keys"
+    [ ! -f "$ALLOWED_KEYS" ] && { error "SSH keys file not found at $ALLOWED_KEYS"; return 1; }
+    cp "$ALLOWED_KEYS" "$user_ssh_dir/authorized_keys" || { error "Failed to copy SSH keys"; return 1; }
     ;;
+
   *)
-    error "Invalid SSH key source specified"
+    error "Invalid SSH key source specified: $key_source"
     return 1
     ;;
   esac
 
-  chown -R "$username:$username" "$user_ssh_dir" || error "Failed to set .ssh ownership"
-  chmod 700 "$user_ssh_dir" || error "Failed to set .ssh permissions"
-  chmod 600 "$user_ssh_dir/authorized_keys" || error "Failed to set authorized_keys permissions"
+  chown -R "$username:$username" "$user_ssh_dir" || { error "Failed to set .ssh ownership"; return 1; }
+  chmod 700 "$user_ssh_dir" || { error "Failed to set .ssh permissions"; return 1; }
+  chmod 600 "$user_ssh_dir/authorized_keys" || { error "Failed to set authorized_keys permissions"; return 1; }
+
+  return 0
 }
 
 secure_home_directory() {
