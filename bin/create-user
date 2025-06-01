@@ -229,7 +229,7 @@ setup_ssh_access() {
   local user_home="/home/$username"
   local user_ssh_dir="$user_home/.ssh"
 
-  info "🔧 Setting up SSH access for $username via $key_source"
+  info "🔧 Setting up SSH directory structure for $username"
 
   # Create .ssh directory with strict permissions
   mkdir -p "$user_ssh_dir" || {
@@ -296,6 +296,12 @@ setup_ssh_access() {
       }
       ;;
 
+    "none")
+      info "🛑 Skipping SSH key import as requested"
+      # Create empty authorized_keys file with correct permissions
+      touch "$user_ssh_dir/authorized_keys"
+      ;;
+
     *)
       error "❌ Invalid SSH key source specified: $key_source"
       return 1
@@ -317,8 +323,8 @@ setup_ssh_access() {
   }
 
   # Final verification
-  [[ -s "$user_ssh_dir/authorized_keys" ]] || {
-    error "❌ authorized_keys is empty after setup"
+  [[ -f "$user_ssh_dir/authorized_keys" ]] || {
+    error "❌ authorized_keys file missing after setup"
     return 1
   }
 
@@ -362,7 +368,7 @@ EOF
 parse_arguments() {
   local username=""
   local github_user=""
-  local key_source="local"
+  local key_source="local"  # Default to local keys
 
   while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -371,6 +377,10 @@ parse_arguments() {
       github_user="$2"
       key_source="github"
       shift 2
+      ;;
+    --no-ssh-keys)
+      key_source="none"
+      shift
       ;;
     --help | -h)
       show_usage
@@ -390,13 +400,16 @@ parse_arguments() {
   echo "$username" "$key_source" "$github_user"
 }
 
+# [Update show_usage to include new option]
 show_usage() {
   cat <<EOF
-Usage: $0 [username] [--github GITHUB_USERNAME]
+Usage: $0 [username] [OPTIONS]
 
 Options:
   username              The username to create (will prompt if not provided)
   --github USERNAME     Import SSH keys from GitHub user's account
+  --no-ssh-keys         Skip SSH key import (still creates ~/.ssh directory)
+  --help, -h            Show this help message
 EOF
   exit 0
 }
