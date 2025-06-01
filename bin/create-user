@@ -101,7 +101,7 @@ import_github_keys() {
   info "Fetching SSH keys from GitHub for user: $github_username"
   local response
   response=$(curl -s "$api_url")
-  if [ $? -ne 0 ]; then
+  if [ $? -ne 0 ] || [ -z "$response" ]; then
     error "Failed to fetch data from GitHub API."
     rm -f "$temp_file"
     return 1
