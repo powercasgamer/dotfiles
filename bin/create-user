@@ -97,6 +97,16 @@ import_github_keys() {
   local github_username="$1"
   local temp_file=$(mktemp)
   local api_url="https://api.github.com/users/$github_username/keys"
+  local rate_limit_url="https://api.github.com/rate_limit"
+
+  # Check rate limits first
+  local rate_response=$(curl -s "$rate_limit_url")
+  local remaining=$(echo "$rate_response" | jq -r '.resources.core.remaining')
+  if [ "$remaining" -lt 10 ]; then
+    error "GitHub API rate limit is low ($remaining remaining). Try again later."
+    rm -f "$temp_file"
+    return 1
+  fi
 
   info "Fetching SSH keys from GitHub for user: $github_username"
   local response
@@ -141,8 +151,20 @@ setup_ssh_access() {
 
   case "$key_source" in
   "github")
-    local key_file=$(import_github_keys "$key_source_value")
-    cat "$key_file" >>"$user_ssh_dir/authorized_keys"
+    local key_file
+    key_file=$(import_github_keys "$key_source_value") || {
+      error "Failed to import GitHub keys"
+      return 1
+    }
+    [ ! -f "$key_file" ] && {
+      error "Temporary key file not found"
+      return 1
+    }
+    cat "$key_file" >>"$user_ssh_dir/authorized_keys" || {
+      rm -f "$key_file"
+      error "Failed to append keys to authorized_keys"
+      return 1
+    }
     rm -f "$key_file"
     ;;
   "local")
@@ -151,6 +173,7 @@ setup_ssh_access() {
     ;;
   *)
     error "Invalid SSH key source specified"
+    return 1
     ;;
   esac
 
