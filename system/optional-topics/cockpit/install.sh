@@ -26,14 +26,39 @@ COCKPIT_PACKAGES=(
     cockpit-packagekit
 )
 
+setup_backports() {
+    step "Configuring backports repository"
+
+    . /etc/os-release
+    local backports_repo="${VERSION_CODENAME}-backports"
+
+    if ! grep -q "^deb .*${backports_repo}" /etc/apt/sources.list; then
+        echo "deb http://archive.ubuntu.com/ubuntu ${backports_repo} main restricted universe multiverse" | \
+        tee -a /etc/apt/sources.list.d/backports.list
+        apt-key adv --keyserver keyserver.ubuntu.com --recv-keys "$(apt-key adv --list-public-keys --with-fingerprint --with-colons | awk -F: '/^pub/ {print $5}' | head -n1)"
+    fi
+}
+
 # Installation function
 install_cockpit() {
-    step "Updating package lists"
+    step "Installing Cockpit from backports"
+
+    . /etc/os-release
+    local backports_repo="${VERSION_CODENAME}-backports"
+
     apt-get update || error "Failed to update package lists"
 
-    step "Installing Cockpit and components"
-    apt-get install -y --no-install-recommends "${COCKPIT_PACKAGES[@]}" || {
-        error "Failed to install Cockpit packages"
+    # Install cockpit from backports
+    if ! apt-get install -y -t "${backports_repo}" cockpit; then
+        warn "Failed to install from backports, trying main repository"
+        apt-get install -y cockpit || error "Failed to install Cockpit"
+    fi
+
+    # Install remaining packages
+    step "Installing additional components"
+    apt-get install -y --no-install-recommends \
+        "${COCKPIT_PACKAGES[@]}" || {
+        warn "Some packages failed to install"
     }
 
     success "Cockpit installed successfully"
@@ -55,25 +80,49 @@ configure_firewall() {
 
 # Service management
 enable_services() {
-    step "Enabling Cockpit service"
+    step "Configuring Cockpit services"
+
     systemctl enable --now cockpit.socket || error "Failed to enable Cockpit service"
+    systemctl restart cockpit || warn "Failed to restart Cockpit (service may not be running)"
+
+    # Verify service status
+    if ! systemctl is-active --quiet cockpit.socket; then
+        warn "Cockpit service not running. Attempting to start..."
+        systemctl start cockpit.socket || error "Failed to start Cockpit"
+    fi
 }
 
+
 # Main installation flow
-{
+main() {
+    info "Starting Cockpit installation on $(lsb_release -ds)"
+
+    setup_backports
     install_cockpit
     configure_firewall
     enable_services
 
-    IP_ADDRESS=$(hostname -I | awk '{print $1}')
+    # Get server IP (prioritize non-local addresses)
+    IP_ADDRESS=$(ip route get 1 | awk '{print $7}' | head -1)
+    [ -z "$IP_ADDRESS" ] && IP_ADDRESS=$(hostname -I | awk '{print $1}')
 
-    success "\nCockpit installation complete!"
-    echo -e "\n${BLUE}Access Information:${NC}"
-    echo -e "  URL: ${BOLD}https://${IP_ADDRESS}:9090${NC}"
-    echo -e "  Login: Your system credentials\n"
+    # Display summary
+    success "\nCockpit installation complete!\n"
+    echo -e "${BOLD}Access Information:${NC}"
+    echo -e "  ${BLUE}URL:${NC} ${GREEN}https://${IP_ADDRESS}:9090${NC}"
+    echo -e "  ${BLUE}Login:${NC} Your system credentials\n"
 
-    echo -e "${BLUE}Installed Components:${NC}"
+    echo -e "${BOLD}Installed Components:${NC}"
     printf "  - %s\n" "${COCKPIT_PACKAGES[@]}"
+    printf "  - %s\n" "${RECOMMENDED_PACKAGES[@]}"
 
-    success "You can now manage your server through the web interface"
+    echo -e "\n${BOLD}Next Steps:${NC}"
+    echo "  1. Open the Cockpit URL in your web browser"
+    echo "  2. Review firewall settings if needed"
+    echo "  3. Check system updates in Cockpit's 'Software Updates' section"
+
+    echo -e "\n${GREEN}✔ Server management console ready${NC}"
 }
+
+# Execute main function
+main

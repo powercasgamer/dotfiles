@@ -93,7 +93,7 @@ setup-user() {
 
   # Copy .zshrc with verification
   if [[ -f "${USER_CONFIG_DIR}/.zshrc" ]]; then
-    if cp -v "${USER_CONFIG_DIR}/.zshrc" "${HOME}/.zshrc"; then
+    if sudo cp -v "${USER_CONFIG_DIR}/.zshrc" "${HOME}/.zshrc"; then
       success "Successfully copied .zshrc configuration"
     else
       error "Failed to copy .zshrc"
