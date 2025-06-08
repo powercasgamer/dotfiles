@@ -21,7 +21,7 @@ JAIL_DIR="/etc/fail2ban/jail.d"
 MAX_RETRY=3
 BAN_TIME="1h"
 FIND_TIME="10m"
-IGNORE_IP="127.0.0.1/8 ::1"
+IGNORE_IP="127.0.0.1\/8 ::1"
 
 # Verify jail files directory exists
 if [ ! -d "$JAIL_FILES_DIR" ]; then
@@ -59,12 +59,12 @@ for jail_file in "${JAIL_FILES_DIR}"/*.local; do
     step "🛡️  Installing ${filename}"
 
     # Copy file and replace placeholders
-    sed -e "s/{{MAX_RETRY}}/$MAX_RETRY/g" \
-        -e "s/{{BAN_TIME}}/$BAN_TIME/g" \
-        -e "s/{{FIND_TIME}}/$FIND_TIME/g" \
-        -e "s/{{IGNORE_IP}}/$IGNORE_IP/g" \
+    sed -e "s|{{MAX_RETRY}}|$MAX_RETRY|g" \
+        -e "s|{{BAN_TIME}}|$BAN_TIME|g" \
+        -e "s|{{FIND_TIME}}|$FIND_TIME|g" \
+        -e "s|{{IGNORE_IP}}|$IGNORE_IP|g" \
         "$jail_file" > "${JAIL_DIR}/${filename}" || {
-        warn "❌ Failed to process ${filename}"
+        echo "❌ Failed to process ${filename}"
         continue
     }
 
