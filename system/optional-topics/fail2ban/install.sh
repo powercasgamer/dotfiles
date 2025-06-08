@@ -1,13 +1,19 @@
 #!/bin/bash
 
 # Fail2Ban Installation Script (Smart Service Detection)
-# Creates jails only for installed services (Caddy, phpMyAdmin, SSH, Pterodactyl/Pelican)
+# Creates jails only for installed services with optional components
 
 # Check if running as root
 if [ "$EUID" -ne 0 ]; then
     echo "❌ Please run as root or with sudo"
     exit 1
 fi
+
+# Configuration parameters (customizable)
+MAX_RETRY=3
+BAN_TIME="1h"
+FIND_TIME="10m"
+IGNORE_IP="127.0.0.1/8 ::1"
 
 # Install Fail2Ban
 echo "🔧 Installing Fail2Ban..."
@@ -40,10 +46,10 @@ enabled = true
 port = $port
 filter = $filter
 logpath = $logpath
-maxretry = 3
-bantime = 1h
-findtime = 10m
-ignoreip = 127.0.0.1/8 ::1
+maxretry = $MAX_RETRY
+bantime = $BAN_TIME
+findtime = $FIND_TIME
+ignoreip = $IGNORE_IP
 EOL
 }
 
@@ -63,20 +69,94 @@ fi
 
 ### phpMyAdmin ###
 if [ -d "/usr/share/phpmyadmin" ] || [ -d "/var/www/html/phpmyadmin" ]; then
-    add_jail "phpmyadmin" "phpmyadmin" "/var/log/syslog" "http,https"
+    # Try to find the most appropriate log file
+    PMA_LOGS=(
+        "/var/log/phpmyadmin/error.log"
+        "/var/log/nginx/phpmyadmin_error.log"
+        "/var/log/apache2/phpmyadmin_error.log"
+        "/var/log/httpd/phpmyadmin_error.log"
+    )
+
+    for log in "${PMA_LOGS[@]}"; do
+        if [ -f "$log" ]; then
+            add_jail "phpmyadmin" "phpmyadmin" "$log" "http,https"
+            break
+        fi
+    done
+
+    # Fallback to syslog if no specific log found
+    if [ ! -f "$JAIL_DIR/phpmyadmin.local" ]; then
+        add_jail "phpmyadmin" "phpmyadmin" "/var/log/syslog" "http,https"
+    fi
 fi
 
-### Pterodactyl Panel  ###
-#if [ -d "/var/www/pterodactyl" ] || [ -d "/var/www/pelican" ]; then
-#    LOGPATH="/var/www/pterodactyl/storage/logs/laravel-*.log"
-#    [ -d "/var/www/pelican" ] && LOGPATH="/var/www/pelican/storage/logs/laravel-*.log"
-#    add_jail "pterodactyl" "pterodactyl" "$LOGPATH" "http,https"
-#fi
+### Nginx (Optional) ###
+if command -v nginx &> /dev/null; then
+    NGINX_LOGS=(
+        "/var/log/nginx/error.log"
+        "/var/log/nginx/access.log"
+    )
+
+    for log in "${NGINX_LOGS[@]}"; do
+        if [ -f "$log" ]; then
+            add_jail "nginx-http-auth" "nginx-http-auth" "$log" "http,https"
+            break
+        fi
+    done
+fi
+
+### MySQL/MariaDB (Optional) ###
+if command -v mysqld &> /dev/null || command -v mariadbd &> /dev/null; then
+    MYSQL_LOGS=(
+        "/var/log/mysql/error.log"
+        "/var/log/mysql.log"
+        "/var/log/mysqld.log"
+        "/var/log/mariadb/mariadb.log"
+    )
+
+    for log in "${MYSQL_LOGS[@]}"; do
+        if [ -f "$log" ]; then
+            add_jail "mysqld-auth" "mysqld-auth" "$log" "3306"
+            break
+        fi
+    done
+fi
+
+### Redis (Optional) ###
+if command -v redis-server &> /dev/null && [ -f "/var/log/redis/redis.log" ]; then
+    add_jail "redis" "redis" "/var/log/redis/redis.log" "6379"
+fi
+
+### MongoDB (Optional) ###
+if command -v mongod &> /dev/null; then
+    MONGO_LOGS=(
+        "/var/log/mongodb/mongod.log"
+        "/var/log/mongo.log"
+    )
+
+    for log in "${MONGO_LOGS[@]}"; do
+        if [ -f "$log" ]; then
+            add_jail "mongodb-auth" "mongodb-auth" "$log" "27017"
+            break
+        fi
+    done
+fi
+
+### Pterodactyl Panel (Optional) ###
+PANEL_PATHS=("/var/www/pterodactyl" "/var/www/pelican")
+for path in "${PANEL_PATHS[@]}"; do
+    if [ -d "$path" ]; then
+        LOGPATH="$path/storage/logs/laravel-$(date +'%Y-%m-%d').log"
+        [ -f "$LOGPATH" ] || LOGPATH="$path/storage/logs/laravel.log"
+        add_jail "pterodactyl" "pterodactyl" "$LOGPATH" "http,https"
+        break
+    fi
+done
 
 # Enable & Restart Fail2Ban
 echo "🔄 Starting Fail2Ban..."
 systemctl enable --now fail2ban
-fail2ban-client reload
+systemctl restart fail2ban
 
 # Status Check
 echo ""

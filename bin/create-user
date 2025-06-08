@@ -7,7 +7,7 @@ readonly LOG_FILE="/var/log/user_creation.log"
 readonly ALLOWED_KEYS="/home/dotfiles/allowed_keys"
 readonly MAX_USERNAME_LENGTH=32
 readonly DEFAULT_SHELL="/bin/zsh"
-readonly REQUIRED_COMMANDS=("curl" "jq" "adduser" "usermod")
+readonly REQUIRED_COMMANDS=("curl" "jq" "adduser" "usermod" "chpasswd")
 
 DOTFILES_ROOT="/usr/local/share/dotfiles-system"
 source "${DOTFILES_ROOT}/system/scripts/logging.sh"
@@ -47,10 +47,29 @@ validate_username() {
 
 create_user_account() {
   local username="$1"
+  local password="$2"
 
   info "Creating user account: $username"
-  adduser --home "/home/$username" --shell "$DEFAULT_SHELL" --gecos "" --disabled-password "$username" ||
-    error "Failed to create user '$username'"
+
+  if [ -n "$password" ]; then
+    # Create user with password
+    adduser --home "/home/$username" --shell "$DEFAULT_SHELL" --gecos "" "$username" || {
+      error "Failed to create user '$username'"
+      return 1
+    }
+
+    # Set password securely
+    echo "$username:$password" | chpasswd || {
+      error "Failed to set password for '$username'"
+      return 1
+    }
+  else
+    # Create user without password (disabled login)
+    adduser --home "/home/$username" --shell "$DEFAULT_SHELL" --gecos "" --disabled-password "$username" || {
+      error "Failed to create user '$username'"
+      return 1
+    }
+  fi
 }
 
 setup_user_groups() {
@@ -369,6 +388,7 @@ parse_arguments() {
   local username=""
   local github_user=""
   local key_source="local"  # Default to local keys
+  local password=""
 
   while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -381,6 +401,11 @@ parse_arguments() {
     --no-ssh-keys)
       key_source="none"
       shift
+      ;;
+    --password)
+      [ -z "$2" ] && error "--password requires a password argument"
+      password="$2"
+      shift 2
       ;;
     --help | -h)
       show_usage
@@ -397,8 +422,8 @@ parse_arguments() {
 
   [ -z "$username" ] && read -rp "Enter the new username: " username
 
-  echo "$username" "$key_source" "$github_user"
-}
+  echo "$username" "$key_source" "$github_user" "$password"
+  }
 
 # [Update show_usage to include new option]
 show_usage() {
@@ -409,6 +434,7 @@ Options:
   username              The username to create (will prompt if not provided)
   --github USERNAME     Import SSH keys from GitHub user's account
   --no-ssh-keys         Skip SSH key import (still creates ~/.ssh directory)
+  --password PASSWORD   Set a password for the user (otherwise disabled)
   --help, -h            Show this help message
 EOF
   exit 0
