@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# User environment setup script (non-invasive)
+# Multi-User Environment Setup Script
 
 # Source logging utilities
 DOTFILES_ROOT="/usr/local/share/dotfiles-system"
@@ -7,13 +7,29 @@ USER_CONFIG_DIR="$DOTFILES_ROOT/user"
 source "${DOTFILES_ROOT}/system/scripts/logging.sh"
 
 setup-user() {
-  step "Starting User Environment Setup"
+  local target_user="$1"
+  local target_home
+  
+  # Validate target user
+  if ! id "$target_user" &>/dev/null; then
+    error "User '$target_user' does not exist"
+    return 1
+  fi
+
+  # Determine home directory
+  target_home=$(eval echo ~"$target_user")
+  if [[ ! -d "$target_home" ]]; then
+    error "Home directory for '$target_user' not found at $target_home"
+    return 1
+  fi
+
+  step "Setting up environment for user: $target_user (home: $target_home)"
 
   # 1. Install Oh My Zsh
   step "Checking Oh My Zsh installation"
-  if [[ ! -d "$HOME/.oh-my-zsh" ]]; then
+  if [[ ! -d "$target_home/.oh-my-zsh" ]]; then
     info "Installing Oh My Zsh..."
-    if sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended --keep-zshrc; then
+    if sudo -u "$target_user" sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended --keep-zshrc; then
       success "Oh My Zsh installed successfully"
     else
       error "Failed to install Oh My Zsh"
@@ -24,13 +40,13 @@ setup-user() {
 
   # 2. Install LS_COLORS
   step "Configuring LS_COLORS"
-  if [[ ! -f "$HOME/.dircolors" ]]; then
+  if [[ ! -f "$target_home/.dircolors" ]]; then
     info "Downloading trapd00r/LS_COLORS..."
-    if curl -fsSL https://github.com/trapd00r/LS_COLORS/raw/master/LS_COLORS -o "$HOME/.dircolors" 2>/dev/null; then
+    if sudo -u "$target_user" curl -fsSL https://github.com/trapd00r/LS_COLORS/raw/master/LS_COLORS -o "$target_home/.dircolors" 2>/dev/null; then
       success "LS_COLORS configured"
     else
       warning "Failed to download LS_COLORS, using system defaults"
-      if dircolors --print-database >"$HOME/.dircolors"; then
+      if sudo -u "$target_user" dircolors --print-database >"$target_home/.dircolors"; then
         info "Created default .dircolors file"
       else
         error "Failed to create .dircolors file"
@@ -40,82 +56,74 @@ setup-user() {
     success "LS_COLORS already configured"
   fi
 
-  # 3. Install zsh-completions
-  step "Setting up zsh-completions"
-  local completions_dir="${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}/plugins/zsh-completions"
-  if [[ ! -d "$completions_dir" ]]; then
-    info "Cloning zsh-completions..."
-    if git clone https://github.com/zsh-users/zsh-completions "$completions_dir" 2>/dev/null; then
-      success "zsh-completions installed"
+  # 3-5. Install zsh plugins
+  local zsh_custom="${ZSH_CUSTOM:-$target_home/.oh-my-zsh/custom}/plugins"
+  declare -A plugins=(
+    ["zsh-completions"]="https://github.com/zsh-users/zsh-completions"
+    ["zsh-syntax-highlighting"]="https://github.com/zsh-users/zsh-syntax-highlighting"
+    ["zsh-autosuggestions"]="https://github.com/zsh-users/zsh-autosuggestions"
+  )
+
+  for plugin in "${!plugins[@]}"; do
+    step "Setting up $plugin"
+    local plugin_dir="$zsh_custom/$plugin"
+    if [[ ! -d "$plugin_dir" ]]; then
+      info "Cloning $plugin..."
+      if sudo -u "$target_user" git clone "${plugins[$plugin]}" "$plugin_dir" 2>/dev/null; then
+        success "$plugin installed"
+      else
+        error "Failed to install $plugin"
+      fi
     else
-      error "Failed to install zsh-completions"
+      success "$plugin already installed"
     fi
-  else
-    success "zsh-completions already installed"
-  fi
-
-  # 4. Install zsh-syntax-highlighting
-  step "Setting up zsh-syntax-highlighting"
-  local highlight_dir="${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}/plugins/zsh-syntax-highlighting"
-  if [[ ! -d "$highlight_dir" ]]; then
-    info "Cloning zsh-syntax-highlighting..."
-    if git clone https://github.com/zsh-users/zsh-syntax-highlighting "$highlight_dir" 2>/dev/null; then
-      success "zsh-syntax-highlighting installed"
-    else
-      error "Failed to install zsh-syntax-highlighting"
-    fi
-  else
-    success "zsh-syntax-highlighting already installed"
-  fi
-
-  # 5. Install zsh-autosuggestions
-  step "Setting up zsh-autosuggestions"
-  local autosuggestions_dir="${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}/plugins/zsh-autosuggestions"
-  if [[ ! -d "$autosuggestions_dir" ]]; then
-    info "Cloning zsh-autosuggestions..."
-    if git clone https://github.com/zsh-users/zsh-autosuggestions "$autosuggestions_dir" 2>/dev/null; then
-      success "zsh-autosuggestions installed"
-    else
-      error "Failed to install zsh-autosuggestions"
-    fi
-  else
-    success "zsh-autosuggestions already installed"
-  fi
-
-  # ===== SETUP COMPLETION =====
-  step "Setup Complete"
-  success "All components installed"
-
-  # Display configuration instructions
-  info "Add these to your .zshrc to enable features:"
-  info "plugins=(git zsh-completions zsh-syntax-highlighting)"
-  info 'eval "$(dircolors -b ~/.dircolors)"'
+  done
 
   # Copy .zshrc with verification
   if [[ -f "${USER_CONFIG_DIR}/.zshrc" ]]; then
-    if sudo cp -v "${USER_CONFIG_DIR}/.zshrc" "${HOME}/.zshrc"; then
+    if sudo cp "${USER_CONFIG_DIR}/.zshrc" "$target_home/.zshrc"; then
+      sudo chown "$target_user:$target_user" "$target_home/.zshrc"
       success "Successfully copied .zshrc configuration"
     else
       error "Failed to copy .zshrc"
       info "You may need to manually copy:"
-      info "cp '${USER_CONFIG_DIR}/.zshrc' '${HOME}/.zshrc'"
+      info "sudo cp '${USER_CONFIG_DIR}/.zshrc' '$target_home/.zshrc'"
+      info "sudo chown $target_user:$target_user '$target_home/.zshrc'"
     fi
   else
-    error "Source .zshrc not found in ${USER_CONFIG_DIR}"
-    info "Creating default .zshrc instead"
-    touch "${HOME}/.zshrc"
+    warning "Source .zshrc not found in ${USER_CONFIG_DIR}"
+    sudo -u "$target_user" touch "$target_home/.zshrc"
   fi
 
   # Verify the file was created
-  if [[ -f "${HOME}/.zshrc" ]]; then
-    chmod 644 "${HOME}/.zshrc"
-    success "Zsh configuration ready at ${HOME}/.zshrc"
+  if [[ -f "$target_home/.zshrc" ]]; then
+    sudo chmod 644 "$target_home/.zshrc"
+    success "Zsh configuration ready at $target_home/.zshrc"
   else
     error "Failed to initialize .zshrc"
   fi
+
+  # Display configuration instructions
+  step "Setup Complete"
+  success "Environment configured for $target_user"
+  info "Add these to $target_home/.zshrc to enable features:"
+  info "plugins=(git zsh-completions zsh-syntax-highlighting zsh-autosuggestions)"
+  info 'eval "$(dircolors -b ~/.dircolors)"'
 }
 
 # Execute if run directly
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
-  setup-user "$@"
+  if [[ $# -eq 0 ]]; then
+    # Default to current user if none specified
+    setup-user "$(whoami)"
+  else
+    # Setup for specified user (requires sudo)
+    if [[ "$(whoami)" != "root" ]]; then
+      error "Root privileges required to setup other users"
+      info "Please run with sudo:"
+      info "sudo $0 username"
+      exit 1
+    fi
+    setup-user "$1"
+  fi
 fi
