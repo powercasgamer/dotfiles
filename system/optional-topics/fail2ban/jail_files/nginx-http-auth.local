@@ -1,0 +1,9 @@
+[nginx-http-auth]
+enabled = true
+port = http,https
+filter = nginx-http-auth
+logpath = /var/log/nginx/error.log
+maxretry = {{MAX_RETRY}}
+bantime = {{BAN_TIME}}
+findtime = {{FIND_TIME}}
+ignoreip = {{IGNORE_IP}}

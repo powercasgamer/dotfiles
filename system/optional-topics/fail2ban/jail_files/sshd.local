@@ -1,0 +1,9 @@
+[sshd]
+enabled = true
+port = ssh
+filter = sshd
+logpath = /var/log/auth.log
+maxretry = {{MAX_RETRY}}
+bantime = {{BAN_TIME}}
+findtime = {{FIND_TIME}}
+ignoreip = {{IGNORE_IP}}

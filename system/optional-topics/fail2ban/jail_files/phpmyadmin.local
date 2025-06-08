@@ -1,0 +1,9 @@
+[phpmyadmin]
+enabled = true
+port = http,https
+filter = phpmyadmin
+logpath = /var/log/phpmyadmin/error.log
+maxretry = {{MAX_RETRY}}
+bantime = {{BAN_TIME}}
+findtime = {{FIND_TIME}}
+ignoreip = {{IGNORE_IP}}

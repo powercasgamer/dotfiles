@@ -1,0 +1,9 @@
+[pterodactyl]
+enabled = true
+port = http,https
+filter = pterodactyl
+logpath = /var/www/pterodactyl/storage/logs/laravel.log
+maxretry = {{MAX_RETRY}}
+bantime = {{BAN_TIME}}
+findtime = {{FIND_TIME}}
+ignoreip = {{IGNORE_IP}}

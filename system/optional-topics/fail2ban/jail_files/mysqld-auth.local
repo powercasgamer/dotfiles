@@ -1,0 +1,9 @@
+[mysqld-auth]
+enabled = true
+port = 3306
+filter = mysqld-auth
+logpath = /var/log/mysql/error.log
+maxretry = {{MAX_RETRY}}
+bantime = {{BAN_TIME}}
+findtime = {{FIND_TIME}}
+ignoreip = {{IGNORE_IP}}

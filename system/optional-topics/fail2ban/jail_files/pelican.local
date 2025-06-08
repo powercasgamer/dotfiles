@@ -1,0 +1,9 @@
+[pelican]
+enabled = true
+port = http,https
+filter = pelican
+logpath = /var/www/pelican/storage/logs/laravel.log
+maxretry = {{MAX_RETRY}}
+bantime = {{BAN_TIME}}
+findtime = {{FIND_TIME}}
+ignoreip = {{IGNORE_IP}}
