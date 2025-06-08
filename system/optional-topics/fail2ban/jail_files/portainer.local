@@ -1,0 +1,12 @@
+[portainer]
+backend = auto
+enabled = true
+port = 80,443
+protocol = tcp
+filter = portainer
+# Number of retrys before to ban. Portainer produces from 2 to 5 log entries per request or failed login.
+maxretry = {{MAX_RETRY}}
+bantime = {{BAN_TIME}}
+findtime = {{FIND_TIME}}
+ignoreip = {{IGNORE_IP}}
+logpath = /var/log/caddy/portainer-access.log

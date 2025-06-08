@@ -1,7 +1,7 @@
 [phpmyadmin]
 enabled = true
 port = http,https
-filter = phpmyadmin
+filter = phpmyadmin-syslog
 logpath = /var/log/phpmyadmin/error.log
 maxretry = {{MAX_RETRY}}
 bantime = {{BAN_TIME}}

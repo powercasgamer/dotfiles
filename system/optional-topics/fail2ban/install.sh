@@ -15,7 +15,9 @@ fi
 # Get script directory and jail files path
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" &> /dev/null && pwd)"
 JAIL_FILES_DIR="${SCRIPT_DIR}/jail_files"
+FILTER_FILES_DIR="${SCRIPT_DIR}/filters"
 JAIL_DIR="/etc/fail2ban/jail.d"
+FILTER_DIR="/etc/fail2ban/filter.d"
 
 # Configuration parameters
 MAX_RETRY=3
@@ -32,6 +34,11 @@ fi
 # Create jail.d directory if it doesn't exist
 mkdir -p "$JAIL_DIR" || {
     warn "❌ Failed to create $JAIL_DIR"
+    exit 1
+}
+
+mkdir -p "$FILTER_DIR" || {
+    warn "❌ Failed to create $FILTER_DIR"
     exit 1
 }
 
@@ -71,6 +78,22 @@ for jail_file in "${JAIL_FILES_DIR}"/*.local; do
     echo "✅ Installed ${filename}"
 done
 
+step "📂 Installing filter configurations from $FILTER_FILES_DIR"
+for filter_file in "${FILTER_FILES_DIR}"/*.conf; do
+    [ -e "$filter_file" ] || continue  # Handle case with no .conf files
+
+    filename=$(basename "$filter_file")
+    step "🔍 Installing filter ${filename}"
+
+    # Copy file to filter.d directory
+    cp "$filter_file" "${FILTER_DIR}/${filename}" || {
+        warn "❌ Failed to copy ${filename}"
+        continue
+    }
+
+    success "✅ Installed filter ${filename}"
+done
+
 # Restart Fail2Ban
 step "🔄 Restarting Fail2Ban..."
 systemctl restart fail2ban || {
@@ -82,4 +105,6 @@ echo ""
 info "📋 Installed jails:"
 ls -1 "$JAIL_DIR"/*.local 2>/dev/null || echo "No jail files installed"
 echo ""
+info "📋 Installed filters:"
+ls -1 "$FILTER_DIR"/*.conf 2>/dev/null || echo "No filter files installed"
 success "✅ Done!"

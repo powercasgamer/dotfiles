@@ -2,7 +2,7 @@
 enabled = true
 port = 6379
 filter = redis
-logpath = /var/log/redis/redis.log
+logpath = /var/log/redis/redis-server.log
 maxretry = {{MAX_RETRY}}
 bantime = {{BAN_TIME}}
 findtime = {{FIND_TIME}}
