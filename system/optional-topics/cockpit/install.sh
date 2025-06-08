@@ -31,12 +31,27 @@ setup_backports() {
 
     . /etc/os-release
     local backports_repo="${VERSION_CODENAME}-backports"
+    local backports_file="/etc/apt/sources.list.d/backports.list"
 
-    if ! grep -q "^deb .*${backports_repo}" /etc/apt/sources.list; then
-        echo "deb http://archive.ubuntu.com/ubuntu ${backports_repo} main restricted universe multiverse" | \
-        tee -a /etc/apt/sources.list.d/backports.list
-        apt-key adv --keyserver keyserver.ubuntu.com --recv-keys "$(apt-key adv --list-public-keys --with-fingerprint --with-colons | awk -F: '/^pub/ {print $5}' | head -n1)"
+    # Check if backports are already configured
+    if grep -rq "${backports_repo}" /etc/apt/sources.list*; then
+        warn "Backports repository already exists - skipping addition"
+        return 0
     fi
+
+    # Add backports with proper format for Ubuntu/Debian
+    if [[ "$ID" == "ubuntu" ]]; then
+        echo "deb http://archive.ubuntu.com/ubuntu ${backports_repo} main restricted universe multiverse" > "$backports_file"
+    else  # Debian
+        echo "deb http://deb.debian.org/debian ${backports_repo} main contrib non-free" > "$backports_file"
+    fi
+
+    # Add the backports priority configuration
+    echo "Package: *
+Pin: release a=${backports_repo}
+Pin-Priority: 100" > /etc/apt/preferences.d/backports
+
+    apt-get update || error "Failed to update package lists after adding backports"
 }
 
 # Installation function
