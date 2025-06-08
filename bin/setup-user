@@ -9,7 +9,7 @@ source "${DOTFILES_ROOT}/system/scripts/logging.sh"
 setup-user() {
   local target_user="$1"
   local target_home
-  
+
   # Validate target user
   if ! id "$target_user" &>/dev/null; then
     error "User '$target_user' does not exist"
