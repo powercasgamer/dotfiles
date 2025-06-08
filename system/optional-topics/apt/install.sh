@@ -2,9 +2,14 @@
 # apt-wrapper-symlinker.sh - System-wide completions
 set -euo pipefail
 
+DOTFILES_ROOT="/usr/local/share/dotfiles-system"
+source "${DOTFILES_ROOT}/system/scripts/scripts.sh" 2>/dev/null || {
+  echo "Error: Failed to load script utilities" >&2
+  exit 1
+}
+
 # Configuration
-DOTFILES_SYSTEM_DIR="/usr/local/share/dotfiles-system"
-SYSTEM_BIN_SOURCE="$DOTFILES_SYSTEM_DIR/bin"
+SYSTEM_BIN_SOURCE="$DOTFILES_ROOT/bin"
 GLOBAL_BIN_TARGET="/usr/local/bin"
 WRAPPER_NAME="apt-secure"
 

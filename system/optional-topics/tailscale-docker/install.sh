@@ -6,8 +6,8 @@
 set -euo pipefail
 
 DOTFILES_ROOT="/usr/local/share/dotfiles-system"
-source "${DOTFILES_ROOT}/system/scripts/logging.sh" 2>/dev/null || {
-  echo "Error: Failed to load logging utilities" >&2
+source "${DOTFILES_ROOT}/system/scripts/scripts.sh" 2>/dev/null || {
+  echo "Error: Failed to load script utilities" >&2
   exit 1
 }
 

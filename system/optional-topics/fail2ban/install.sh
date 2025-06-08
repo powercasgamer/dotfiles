@@ -1,7 +1,10 @@
 #!/bin/bash
 
-# Fail2Ban Configuration Installer
-# Copies all .local files from jail_files directory to Fail2Ban jail.d
+DOTFILES_ROOT="/usr/local/share/dotfiles-system"
+source "${DOTFILES_ROOT}/system/scripts/scripts.sh" 2>/dev/null || {
+  echo "Error: Failed to load script utilities" >&2
+  exit 1
+}
 
 # Check if running as root
 if [ "$EUID" -ne 0 ]; then

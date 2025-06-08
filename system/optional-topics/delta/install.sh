@@ -2,21 +2,17 @@
 # Delta Installer - https://github.com/dandavison/delta
 set -euo pipefail
 
+DOTFILES_ROOT="/usr/local/share/dotfiles-system"
+source "${DOTFILES_ROOT}/system/scripts/scripts.sh" 2>/dev/null || {
+  echo "Error: Failed to load script utilities" >&2
+  exit 1
+}
+
 # Configuration
 DELTA_VERSION="0.16.5"  # Set to "latest" to get newest version
 INSTALL_METHOD=""       # auto|deb|rpm|static|cargo|brew (auto detects if empty)
 PREFIX="/usr/local"     # Installation prefix for static/cargo methods
 
-# Colors
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-NC='\033[0m'
-
-# Logging functions
-info() { echo -e "${GREEN}[INFO]${NC} $1"; }
-warn() { echo -e "${YELLOW}[WARN]${NC} $1"; }
-error() { echo -e "${RED}[ERROR]${NC} $1" >&2; }
 fatal() { error "$1"; exit 1; }
 
 # Detect platform

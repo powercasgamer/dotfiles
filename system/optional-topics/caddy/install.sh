@@ -2,18 +2,18 @@
 # Latest Caddy 2 Installer with xcaddy and config template support
 set -euo pipefail
 
+DOTFILES_ROOT="/usr/local/share/dotfiles-system"
+source "${DOTFILES_ROOT}/system/scripts/scripts.sh" 2>/dev/null || {
+  echo "Error: Failed to load script utilities" >&2
+  exit 1
+}
+
 # Configuration
 INSTALL_DIR="/usr/local/bin"
 XCADDY_DIR="/opt/xcaddy-build"
 CADDY_CONFIG_DIR="/etc/caddy"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CADDY_TEMPLATE="${SCRIPT_DIR}/Caddyfile"
-
-# Colorized output
-function info() { echo -e "\033[34m[INFO]\033[0m $*"; }
-function success() { echo -e "\033[32m[✓]\033[0m $*"; }
-function warning() { echo -e "\033[33m[!]\033[0m $*"; }
-function error() { echo -e "\033[31m[✗]\033[0m $*" >&2; exit 1; }
 
 # ==================== CONFIG TEMPLATE ====================
 function setup_config() {
