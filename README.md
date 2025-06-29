@@ -19,3 +19,7 @@ source "${DOTFILES_ROOT}/system/scripts/scripts.sh" 2>/dev/null || {
   exit 1
 }
 ```
+
+```shell
+bash <(curl -s https://raw.githubusercontent.com/powercasgamer/dotfiles/main/system.sh)
+```

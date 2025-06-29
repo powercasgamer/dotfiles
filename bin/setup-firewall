@@ -98,51 +98,77 @@ function setup_common() {
     echo "🔧 Configuring common firewall rules"
 
     # Default deny incoming
-    #sudo ufw default deny incoming
+    sudo ufw default deny incoming
 
     # Allow SSH (with rate limiting)
     sudo ufw limit 22/tcp comment "SSH with rate limiting"
 
-    # Ping
-    sudo ufw allow icmp comment "ICMP (ping)"
+    # ICMP controls
+    read -p "🔍 Allow ICMP (ping)? Choose: [1] Echo only [2] All ICMP [3] None: " icmp_choice
+    case $icmp_choice in
+        1)
+            sudo ufw allow icmp echo-request comment "ICMP echo-request"
+            echo "✅ Allowed ICMP ping only"
+            ;;
+        2)
+            sudo ufw allow icmp comment "All ICMP"
+            echo "✅ Allowed all ICMP types"
+            ;;
+        *)
+            echo "❌ ICMP completely blocked"
+           ;;
+    esac
 
     echo "✅ Common rules applied (SSH, ICMP)"
 }
 
 function setup_pelican() {
-    echo "🦢 Configuring Pelican/Pterodactyl firewall rules"
+    echo "🦢 Configuring Pelican/Pterodactyl firewall rules (Secure Mode)"
 
-    # Default database ports
-    echo "🔹 Applying default database rules for Pelican network..."
-    sudo ufw allow in on $PELICAN_IFACE to 172.18.0.1 port 3306 proto tcp comment "Pelican MySQL"
-    sudo ufw allow in on $PELICAN_IFACE to 172.18.0.1 port 5432 proto tcp comment "Pelican PostgreSQL"
-    sudo ufw allow in on $PELICAN_IFACE to 172.18.0.1 port 6379 proto tcp comment "Pelican Redis"
-    sudo ufw allow in on $PELICAN_IFACE to 172.18.0.1 port 27017 proto tcp comment "Pelican MongoDB"
+    # Define allowed sources (localhost + Docker networks)
+    local ALLOWED_SOURCES="127.0.0.1 172.16.0.0/12"
+    local PELICAN_IP="172.18.0.1"
 
-    # Optional additional ports
-    read -p "Would you like to whitelist additional ports to 172.18.0.1? [y/N] " add_ports
+    echo "🔒 Restricting access to localhost and Docker networks only"
+    echo "   Allowed sources: $ALLOWED_SOURCES"
+
+    # Default database ports with source restrictions
+    echo "🔹 Applying secure database rules for Pelican network..."
+    for port in 3306 5432 6379 27017; do
+        for source in $ALLOWED_SOURCES; do
+            sudo ufw delete allow in on $PELICAN_IFACE to $PELICAN_IP port $port >/dev/null 2>&1
+            sudo ufw allow proto tcp from $source to $PELICAN_IP port $port comment "Pelican DB Port $port"
+            echo "  ✅ $source → $PELICAN_IP:$port (TCP)"
+        done
+    done
+
+    # Optional additional ports with same restrictions
+    read -p "🔹 Would you like to whitelist additional ports to $PELICAN_IP? [y/N] " add_ports
     if [[ "$add_ports" =~ ^[Yy]$ ]]; then
         while true; do
-            read -p "Enter port(s) to whitelist (can be single, space-separated, or range like 25565-25570): " port_input
+            read -p "Enter port(s) (single, space-separated, or range) or 'done': " port_input
             [[ "$port_input" == "done" ]] && break
 
+            # Parse ports (assuming parse_ports function exists)
             PORTS=($(parse_ports "$port_input"))
 
             if [ ${#PORTS[@]} -eq 0 ]; then
-                echo "❌ No valid ports provided"
+                echo "❌ Invalid port input"
                 continue
             fi
 
             for port in "${PORTS[@]}"; do
-                sudo ufw allow in on $PELICAN_IFACE to 172.18.0.1 port "$port" proto tcp comment "Pelican Custom Port"
-                echo "✅ Whitelisted port $port on $PELICAN_IFACE → 172.18.0.1"
+                for source in $ALLOWED_SOURCES; do
+                    sudo ufw allow proto tcp from $source to $PELICAN_IP port $port comment "Pelican Custom Port $port"
+                    echo "  ✅ $source → $PELICAN_IP:$port (TCP)"
+                done
             done
         done
     fi
 
-    echo "✅ Pelican firewall configuration complete"
-    echo "   Summary of rules for $PELICAN_IFACE:"
-    sudo ufw status | grep $PELICAN_IFACE
+    echo "✅ Secure Pelican firewall configuration complete"
+    echo "   Summary of restricted rules:"
+    sudo ufw status | grep -E "(Pelican|$PELICAN_IP)"
 }
 
 function show_menu() {
@@ -170,6 +196,11 @@ function main() {
         echo "❌ UFW is not installed. Installing now..."
         sudo apt update
         sudo apt install -y ufw
+    fi
+
+    if [[ "$PELICAN_IFACE" != "pelican0" ]] && ! ip link show "$PELICAN_IFACE" >/dev/null 2>&1; then
+        warn "⚠️  Warning: Configured interface $PELICAN_IFACE not found"
+        warn "Available interfaces: $(ip link show | grep -E '^[0-9]+:' | cut -d: -f2 | tr '\n' ' ')"
     fi
 
     while true; do
