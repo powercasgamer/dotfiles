@@ -11,7 +11,7 @@ function gsfp() {
 
     git switch "$1"
     git fetch
-    git pull
+    git pull --rebase
 }
 
 function gca() {
