@@ -72,20 +72,10 @@ bindkey '^[[F' end-of-line
 # Load local/non-versioned configs (prioritize .zshrc.local)
 [[ -f "${HOME}/.zshrc.local" ]] && source "${HOME}/.zshrc.local"
 [[ -f "${HOME}/.localrc" ]] && source "${HOME}/.localrc"
+[[ -f "${HOME}/aliases.zsh" ]] && source "${HOME}/aliases.zsh"
 
-# ===== SUGGESTED IMPROVEMENTS =====
-# Uncomment or add as needed:
-# 1. Faster alternative to agnoster:
-#    ZSH_THEME="powerlevel10k/powerlevel10k"  # Requires manual install
-#
-# 2. Python/conda support:
-#    [[ -f "${HOME}/miniconda3/etc/profile.d/conda.sh" ]] && source "${HOME}/miniconda3/etc/profile.d/conda.sh"
-#
 # 3. Fuzzy finder (fzf) integration:
 #    [[ -f "${HOME}/.fzf.zsh" ]] && source "${HOME}/.fzf.zsh"
 #
 # 4. Directory navigation (zoxide or autojump):
 #    eval "$(zoxide init zsh)"  # `z` instead of `cd`
-#
-# 5. Git status in prompt (if not using agnoster):
-#    autoload -Uz vcs_info && zstyle ':vcs_info:*' enable git
