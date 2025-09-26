@@ -75,23 +75,32 @@ function setup_tcpshield() {
     # Download latest TCPShield IPs
     curl -s "$TCPSHIELD_IPS_URL" -o "$IP_LISTS_DIR/tcpshield_ips.txt"
 
-    # Get ports from user
-    read -p "Enter ports to open for TCPShield (space-separated, can use ranges like 25565-25570): " port_input
+    # Get ports from user (for TCP only)
+    read -p "Enter TCP ports to open for TCPShield (space-separated, can use ranges like 25565-25570): " port_input
     PORTS=($(parse_ports "$port_input"))
 
     if [ ${#PORTS[@]} -eq 0 ]; then
-        echo "❌ No valid ports provided"
-        return
+        echo "❌ No valid TCP ports provided"
+    else
+        # Allow TCPShield IPs to specified TCP ports
+        while read -r ip; do
+            for port in "${PORTS[@]}"; do
+                sudo ufw allow proto tcp from "$ip" to any port "$port" comment "TCPShield TCP"
+            done
+        done < "$IP_LISTS_DIR/tcpshield_ips.txt"
+
+        echo "✅ TCPShield TCP rules applied for ports: ${PORTS[*]}"
     fi
 
-    # Allow TCPShield IPs to specified ports
-    while read -r ip; do
-        for port in "${PORTS[@]}"; do
-            sudo ufw allow proto tcp from "$ip" to any port "$port" comment "TCPShield"
-        done
-    done < "$IP_LISTS_DIR/tcpshield_ips.txt"
+    # Ask about Bedrock/UDP 19132
+    read -p "Would you like to also whitelist UDP/19132 for Bedrock? [y/N] " bedrock_choice
+    if [[ "$bedrock_choice" =~ ^[Yy]$ ]]; then
+        while read -r ip; do
+            sudo ufw allow proto udp from "$ip" to any port 19132 comment "TCPShield Bedrock UDP"
+        done < "$IP_LISTS_DIR/tcpshield_ips.txt"
 
-    echo "✅ TCPShield rules applied for ports: ${PORTS[*]}"
+        echo "✅ TCPShield UDP rule applied for port 19132 (Bedrock)"
+    fi
 }
 
 function setup_common() {
