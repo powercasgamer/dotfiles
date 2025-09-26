@@ -86,6 +86,7 @@ function setup_tcpshield() {
         while read -r ip; do
             for port in "${PORTS[@]}"; do
                 sudo ufw allow proto tcp from "$ip" to any port "$port" comment "TCPShield TCP"
+                sudo ufw allow proto udp from "$ip" to any port "$port" comment "TCPShield UDP"
             done
         done < "$IP_LISTS_DIR/tcpshield_ips.txt"
 
