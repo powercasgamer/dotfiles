@@ -1,0 +1,26 @@
+# Applied to every repo on this machine via core.excludesfile.
+# Keep this to OS/editor/tool cruft only — project-specific ignores
+# (node_modules, build/, *.pyc, ...) belong in each repo's own .gitignore.
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# Editors / IDEs
+*.swp
+*.swo
+*~
+.vscode/
+.idea/
+*.sublime-workspace
+
+# Env files that should never be committed by accident
+.env
+.env.local
+.env.*.local

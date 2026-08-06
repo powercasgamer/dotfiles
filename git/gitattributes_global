@@ -1,0 +1,20 @@
+# Applied to every repo on this machine via core.attributesfile.
+# Project-specific rules (LFS patterns, generated-file markers, ...) belong
+# in each repo's own .gitattributes.
+
+# Normalize line endings: let git decide text vs binary, always store as LF.
+* text=auto eol=lf
+
+# Common binaries git sometimes misdetects as text
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.pdf binary
+*.woff binary
+*.woff2 binary
+
+# Don't let diffs run on lockfiles
+package-lock.json -diff
+yarn.lock -diff

@@ -10,7 +10,9 @@ script to reproduce the whole setup.
 dotfiles/
 ├── install.sh        # installs Oh My Zsh + plugins, symlinks ~/.zshrc, runs git/setup.sh
 ├── git/
-│   └── setup.sh       # git identity/defaults, git-lfs, SSH commit+tag signing
+│   ├── setup.sh                # git identity/defaults, git-lfs, SSH commit+tag signing
+│   ├── gitignore_global        # applied to every repo via core.excludesfile
+│   └── gitattributes_global    # applied to every repo via core.attributesfile
 └── zsh/
     ├── zshrc                       # main config (becomes ~/.zshrc via symlink)
     ├── aliases/
@@ -73,6 +75,12 @@ Run automatically by `install.sh`, or standalone any time. Sets:
   `rerere.enabled=true`.
 - **git-lfs**: downloaded straight from the GitHub release (no `sudo`
   needed) into `~/.local/bin`, then `git lfs install`.
+- **Global ignore/attributes**: points `core.excludesfile` /
+  `core.attributesfile` at `gitignore_global` / `gitattributes_global` in
+  this repo. Only OS/editor cruft (`.DS_Store`, `*.swp`, `.idea/`, ...) and
+  universal normalization (`* text=auto eol=lf`, common binary types) live
+  here — project-specific rules still belong in each repo's own
+  `.gitignore` / `.gitattributes`.
 - **SSH commit/tag signing**: if `~/.ssh/id_ed25519.pub` exists, configures
   `gpg.format=ssh`, points `user.signingkey` at it, turns on
   `commit.gpgsign` / `tag.gpgsign`, and writes `~/.ssh/allowed_signers` so

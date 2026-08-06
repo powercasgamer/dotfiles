@@ -3,6 +3,7 @@
 # Safe to re-run. Called from ../install.sh, but can be run standalone too.
 set -euo pipefail
 
+GIT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 GIT_NAME="powercas_gamer"
 GIT_EMAIL="cas@mizule.dev"
 LFS_VERSION="3.7.1"
@@ -17,6 +18,10 @@ git config --global push.autoSetupRemote true
 git config --global core.editor nano
 git config --global rerere.enabled true
 git config --global color.ui auto
+
+echo "==> Global .gitignore / .gitattributes"
+git config --global core.excludesfile "$GIT_DIR/gitignore_global"
+git config --global core.attributesfile "$GIT_DIR/gitattributes_global"
 
 echo "==> git-lfs"
 if ! command -v git-lfs >/dev/null 2>&1; then
