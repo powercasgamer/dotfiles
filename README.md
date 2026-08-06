@@ -27,6 +27,9 @@ dotfiles/
 │   ├── ssh_config               # client hardening defaults, included via ~/.ssh/config
 │   ├── harden-server.sh        # server-side hardening (opt-in, NOT run by install.sh -- see below)
 │   └── sshd_hardening.conf      # drop-in installed to /etc/ssh/sshd_config.d/ by harden-server.sh
+├── docker/
+│   ├── setup.sh                # installs Docker Engine + Compose plugin (opt-in, NOT run by install.sh)
+│   └── daemon.json              # daemon hardening, installed to /etc/docker/daemon.json
 └── zsh/
     ├── zshrc                       # main config (becomes ~/.zshrc via symlink)
     ├── aliases/
@@ -36,6 +39,7 @@ dotfiles/
     │   ├── safety/aliases.zsh      # rm/cp/mv -i
     │   ├── system/aliases.zsh      # apt update/install, ports, myip
     │   ├── tmux/aliases.zsh        # tm/tma/tml/tmk/tmn, claude-tmux
+    │   ├── docker/aliases.zsh      # d, dc, dps, dcup/dcdown, docker-compose compat
     │   └── misc/aliases.zsh        # reload, zshconfig, dotfiles
     ├── exports/
     │   └── core/exports.zsh        # EDITOR, history size, PATH, less colors
@@ -69,6 +73,10 @@ rather than failing the whole script — install `tmux` and re-run any time.
 To make zsh your login shell: `chsh -s $(command -v zsh)` (needs a real
 terminal for the password prompt).
 
+Docker is also opt-in and not part of `install.sh` (it needs root for a
+system package + daemon, unlike everything else here) — see the Docker
+section below.
+
 ## Creating a new user with this setup already applied
 
 ```bash
@@ -76,6 +84,7 @@ sudo ~/dotfiles/new-user.sh <username>              # prompts for a password and
 sudo ~/dotfiles/new-user.sh <username> --no-password # creates the account locked instead
 sudo ~/dotfiles/new-user.sh <username> \
   --git-name "Their Name" --git-email "them@example.com"  # skip the git identity prompt too
+sudo ~/dotfiles/new-user.sh <username> --docker  # also add them to the docker group
 ```
 
 Must be run as root (it calls `useradd`/`apt-get`/`passwd`), so it needs a
@@ -237,3 +246,49 @@ auth with no key installed would have locked out all remote access. The
 line is in `ssh/sshd_hardening.conf`, commented out, with instructions:
 once you've added a key to `authorized_keys` and confirmed key-based login
 works from another terminal, uncomment it and re-run the script.
+
+## Docker setup (`docker/setup.sh`)
+
+Opt-in only, like `ssh/harden-server.sh` — needs root (apt repo + packages
++ systemd + group membership), so it's never run automatically by
+`install.sh`.
+
+```bash
+sudo ~/dotfiles/docker/setup.sh [username]
+```
+
+`username` defaults to `$SUDO_USER` (whoever ran `sudo`) if not given. What
+it does:
+
+1. Adds Docker's official apt repo (key to `/etc/apt/keyrings/docker.asc`,
+   source to `/etc/apt/sources.list.d/docker.list`, matching this machine's
+   `$VERSION_CODENAME` and architecture) and installs `docker-ce`,
+   `docker-ce-cli`, `containerd.io`, `docker-buildx-plugin`, and
+   `docker-compose-plugin` — skipped if `docker` + `docker compose` are
+   already present.
+2. Enables and starts the `docker` service.
+3. Installs `docker/daemon.json` to `/etc/docker/daemon.json` (backing up
+   anything already there that differs) and restarts the daemon **only**
+   when the content actually changed — `live-restore: true` in that file
+   means running containers survive the restart either way. Hardening in
+   that file: JSON log rotation (`max-size: 10m`, `max-file: 3` — the
+   default log driver has no rotation at all and will happily fill your
+   disk), `no-new-privileges` by default, and `icc: false` (disables
+   inter-container communication on the default bridge network only —
+   doesn't affect `docker compose`, which creates its own network per
+   project regardless).
+4. Adds the target user to the `docker` group.
+
+**Docker group membership is root-equivalent** on this machine — anyone in
+it can bind-mount the host filesystem into a container. `new-user.sh`
+reflects that: it's an explicit `--docker` flag, not automatic, for exactly
+the same reason `ssh/harden-server.sh` won't touch `PasswordAuthentication`
+without being asked. After being added to the group, log out/in (or open a
+new terminal) for it to take effect — this shell was already running before
+group membership changed, so it won't pick it up on its own.
+
+Only `docker compose` (the plugin, v2, space not hyphen) gets installed —
+the old standalone `docker-compose` binary is deprecated upstream.
+`zsh/aliases/docker/aliases.zsh` adds a `docker-compose` shell alias for
+muscle memory (`d`, `dc`, `dps`, `dcup`/`dcdown`, etc.), though it won't
+help non-interactive scripts that call the literal `docker-compose` binary.

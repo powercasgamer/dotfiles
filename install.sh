@@ -59,5 +59,13 @@ echo "==> SSH client config"
 echo "    (server-side hardening is separate and NOT run automatically --"
 echo "    see ssh/harden-server.sh)"
 
+echo "==> Docker"
+if command -v docker >/dev/null 2>&1; then
+  echo "    already installed"
+else
+  echo "    not installed (needs root, so not run automatically here):"
+  echo "    sudo ~/dotfiles/docker/setup.sh"
+fi
+
 echo "==> Done. Start a new zsh session with: exec zsh"
 echo "    To make zsh your login shell: chsh -s \$(command -v zsh)"
