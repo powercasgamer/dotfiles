@@ -1,0 +1,38 @@
+# ~/dotfiles/zsh/zshrc
+# Symlinked to ~/.zshrc by dotfiles/install.sh — keep machine-specific stuff out of this file.
+
+export ZSH="$HOME/.oh-my-zsh"
+
+ZSH_THEME="robbyrussell"
+
+# Plugins:
+#   git                   - git aliases/status in prompt info
+#   sudo                  - press Esc twice to prepend sudo to the current/previous command
+#   command-not-found     - suggests the apt package that provides a missing command
+#   colored-man-pages     - adds color to man pages
+#   extract               - `x <archive>` to unpack (almost) anything
+#   z                     - `z <partial-dir-name>` jumps to frecent directories
+#   zsh-completions       - extra completion definitions
+#   zsh-autosuggestions   - fish-style suggestions from history as you type (-> right arrow to accept)
+#   zsh-syntax-highlighting - must stay last: colors commands green/red as valid/invalid
+plugins=(
+  git
+  sudo
+  command-not-found
+  colored-man-pages
+  extract
+  z
+  zsh-completions
+  zsh-autosuggestions
+  zsh-syntax-highlighting
+)
+
+source "$ZSH/oh-my-zsh.sh"
+
+# --- custom config: aliases, exports, functions ---
+for file in "$HOME"/dotfiles/zsh/{exports,aliases,functions}.zsh; do
+  [ -r "$file" ] && source "$file"
+done
+
+# --- machine-local overrides (not tracked, safe to keep secrets/host-specific tweaks here) ---
+[ -r "$HOME/.zshrc.local" ] && source "$HOME/.zshrc.local"
