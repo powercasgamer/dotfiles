@@ -9,6 +9,7 @@ script to reproduce the whole setup.
 ```
 dotfiles/
 ├── install.sh        # installs Oh My Zsh + plugins, symlinks ~/.zshrc, runs git/setup.sh
+├── new-user.sh        # creates a Linux user and bootstraps this whole setup for them
 ├── git/
 │   ├── setup.sh                # git identity/defaults, git-lfs, SSH commit+tag signing
 │   ├── gitignore_global        # applied to every repo via core.excludesfile
@@ -48,6 +49,31 @@ and it will skip anything already installed.
 
 To make zsh your login shell: `chsh -s $(command -v zsh)` (needs a real
 terminal for the password prompt).
+
+## Creating a new user with this setup already applied
+
+```bash
+sudo ~/dotfiles/new-user.sh <username>              # prompts for a password
+sudo ~/dotfiles/new-user.sh <username> --no-password # creates the account locked instead
+```
+
+Must be run as root (it calls `useradd`/`apt-get`/`passwd`), so it needs a
+real terminal — same reason `sudo` itself needs one. What it does:
+
+1. Installs `zsh`/`git`/`curl` system-wide via `apt-get` if missing (no
+   nested `sudo` needed — the script is already root).
+2. Creates the user with zsh as their login shell, if they don't already
+   exist. Existing users are left alone and just get the steps below re-run.
+3. Copies this `dotfiles` folder into their home directory — but only if
+   they don't already have one there, so re-running never clobbers a user's
+   own edits to their copy.
+4. Runs `install.sh` as that user (Oh My Zsh, plugins, `~/.zshrc` symlink,
+   `git/setup.sh`).
+
+Each new user gets their own copy of the repo, so they can diverge from
+yours independently. Their SSH signing key won't exist yet (private keys are
+never copied by this repo) — `git/setup.sh` detects that and just skips
+signing setup with instructions, same as on a fresh machine.
 
 ## Making changes
 
