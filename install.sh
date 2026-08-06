@@ -46,5 +46,13 @@ ln -sf "$DOTFILES_DIR/zsh/zshrc" "$HOME/.zshrc"
 echo "==> Git config, git-lfs, SSH signing"
 "$DOTFILES_DIR/git/setup.sh"
 
+echo "==> tmux"
+if command -v tmux >/dev/null 2>&1; then
+  "$DOTFILES_DIR/tmux/setup.sh"
+else
+  echo "    tmux not installed, skipping. Install it and re-run this script, or"
+  echo "    just run: sudo apt install -y tmux && ~/dotfiles/tmux/setup.sh"
+fi
+
 echo "==> Done. Start a new zsh session with: exec zsh"
 echo "    To make zsh your login shell: chsh -s \$(command -v zsh)"

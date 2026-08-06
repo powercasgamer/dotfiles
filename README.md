@@ -8,12 +8,20 @@ script to reproduce the whole setup.
 
 ```
 dotfiles/
-├── install.sh        # installs Oh My Zsh + plugins, symlinks ~/.zshrc, runs git/setup.sh
+├── install.sh        # installs Oh My Zsh + plugins, symlinks ~/.zshrc, runs git/setup.sh + tmux/setup.sh
 ├── new-user.sh        # creates a Linux user and bootstraps this whole setup for them
 ├── git/
 │   ├── setup.sh                # git identity/defaults, git-lfs, SSH commit+tag signing
 │   ├── gitignore_global        # applied to every repo via core.excludesfile
 │   └── gitattributes_global    # applied to every repo via core.attributesfile
+├── tmux/
+│   ├── setup.sh                # symlinks ~/.tmux.conf, installs TPM + plugins
+│   ├── tmux.conf                # main config (becomes ~/.tmux.conf via symlink)
+│   └── conf.d/
+│       ├── options.conf         # mouse, vi keys, true color, history
+│       ├── bindings.conf        # pane splits/nav, reload binding
+│       ├── statusbar.conf       # status bar styling
+│       └── plugins.conf         # TPM plugin list (tpm/sensible/resurrect/continuum/yank)
 └── zsh/
     ├── zshrc                       # main config (becomes ~/.zshrc via symlink)
     ├── aliases/
@@ -22,6 +30,7 @@ dotfiles/
     │   ├── nav/aliases.zsh         # .., ..., -
     │   ├── safety/aliases.zsh      # rm/cp/mv -i
     │   ├── system/aliases.zsh      # apt update/install, ports, myip
+    │   ├── tmux/aliases.zsh        # tm/tma/tml/tmk/tmn, claude-tmux
     │   └── misc/aliases.zsh        # reload, zshconfig, dotfiles
     ├── exports/
     │   └── core/exports.zsh        # EDITOR, history size, PATH, less colors
@@ -38,14 +47,16 @@ category is just making a new folder and dropping a `.zsh` file in it, e.g.
 ## Set up on a new machine
 
 ```bash
-sudo apt update && sudo apt install -y zsh git curl   # if not already present
+sudo apt update && sudo apt install -y zsh git curl tmux   # if not already present
 git clone <this-repo-url> ~/dotfiles    # or scp/rsync the folder over
 ~/dotfiles/install.sh
 exec zsh
 ```
 
 `install.sh` is idempotent — re-run it any time (e.g. after pulling updates)
-and it will skip anything already installed.
+and it will skip anything already installed. `tmux` is optional: if it's not
+installed when `install.sh` runs, the tmux step is skipped (with a note)
+rather than failing the whole script — install `tmux` and re-run any time.
 
 To make zsh your login shell: `chsh -s $(command -v zsh)` (needs a real
 terminal for the password prompt).
@@ -62,8 +73,8 @@ sudo ~/dotfiles/new-user.sh <username> \
 Must be run as root (it calls `useradd`/`apt-get`/`passwd`), so it needs a
 real terminal — same reason `sudo` itself needs one. What it does:
 
-1. Installs `zsh`/`git`/`curl` system-wide via `apt-get` if missing (no
-   nested `sudo` needed — the script is already root).
+1. Installs `zsh`/`git`/`curl`/`tmux` system-wide via `apt-get` if missing
+   (no nested `sudo` needed — the script is already root).
 2. Creates the user with zsh as their login shell, if they don't already
    exist. Existing users are left alone and just get the steps below re-run.
 3. Copies this `dotfiles` folder into their home directory — but only if
@@ -131,3 +142,40 @@ To actually get the "Verified" badge on GitHub, add the public key there
 separately as a **Signing Key** (Settings → SSH and GPG keys → New SSH key →
 Key type: Signing Key) — a key already added as an Authentication key still
 needs to be added a second time as a Signing key.
+
+## tmux setup (`tmux/setup.sh`)
+
+Run automatically by `install.sh` if `tmux` is present, or standalone any
+time. Symlinks `~/.tmux.conf` to `tmux/tmux.conf` (which explicitly sources
+each file under `conf.d/`, in a fixed order — `plugins.conf` must load last
+since TPM's own init line has to be the final thing tmux processes), then
+installs [TPM](https://github.com/tmux-plugins/tpm) and the plugins listed
+in `conf.d/plugins.conf`:
+
+- `tmux-sensible` — better defaults
+- `tmux-resurrect` + `tmux-continuum` — auto-save/restore session layout
+  every 15 min, so a server restart doesn't lose your panes
+- `tmux-yank` — copy tmux selections to the system clipboard
+
+Prefix stays the tmux default (`C-b`). Notable bindings: `|`/`-` split
+panes (keeping the current directory), `h`/`j`/`k`/`l` move between panes,
+`r` reloads the config. Mouse mode and vi-style copy mode are on.
+
+New categories under `conf.d/` just need an explicit `source-file` line
+added to `tmux.conf` — kept explicit rather than globbed so load order
+(plugins last) can't silently break.
+
+### Running Claude Code inside tmux
+
+`claude-tmux` (defined in `zsh/aliases/tmux/aliases.zsh`) attaches to a
+tmux session named `claude` if one's already running, or creates it with
+`claude` running inside if not:
+
+```bash
+claude-tmux
+```
+
+Detach with the usual `<prefix> d` — Claude Code keeps running in the
+background (including through an SSH disconnect), and `claude-tmux` from any
+terminal picks the same session back up. Other tmux shortcuts: `tm` (tmux),
+`tma <name>` (attach), `tml` (list sessions), `tmk <name>` (kill a session).

@@ -44,7 +44,7 @@ DOTFILES_SRC="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 echo "==> Checking system dependencies"
 MISSING=()
-for cmd in zsh git curl; do
+for cmd in zsh git curl tmux; do
   command -v "$cmd" >/dev/null 2>&1 || MISSING+=("$cmd")
 done
 if [ "${#MISSING[@]}" -gt 0 ]; then
@@ -52,7 +52,7 @@ if [ "${#MISSING[@]}" -gt 0 ]; then
   apt-get update -qq
   apt-get install -y "${MISSING[@]}"
 else
-  echo "    zsh, git, curl already present"
+  echo "    zsh, git, curl, tmux already present"
 fi
 
 if id "$USERNAME" >/dev/null 2>&1; then
