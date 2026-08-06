@@ -29,9 +29,12 @@ plugins=(
 
 source "$ZSH/oh-my-zsh.sh"
 
-# --- custom config: aliases, exports, functions ---
-for file in "$HOME"/dotfiles/zsh/{exports,aliases,functions}.zsh; do
-  [ -r "$file" ] && source "$file"
+# --- custom config: exports, functions, aliases ---
+# Loaded recursively so any *.zsh file, at any nesting depth, gets picked up —
+# e.g. aliases/git/aliases.zsh, aliases/work/docker.zsh, exports/core/exports.zsh.
+# (N) = nullglob: don't error if a category has no files yet.
+for file in "$HOME"/dotfiles/zsh/{exports,functions,aliases}/**/*.zsh(N); do
+  source "$file"
 done
 
 # --- machine-local overrides (not tracked, safe to keep secrets/host-specific tweaks here) ---

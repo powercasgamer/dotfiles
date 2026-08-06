@@ -1,0 +1,5 @@
+alias update="sudo apt update && sudo apt upgrade -y"
+alias install="sudo apt install"
+alias autoremove="sudo apt autoremove -y"
+alias ports="sudo ss -tulpn"
+alias myip="curl -s ifconfig.me"
