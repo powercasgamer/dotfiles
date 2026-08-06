@@ -1,0 +1,20 @@
+# Portable SSH client hardening/defaults, included from ~/.ssh/config by
+# ssh/setup.sh. Host-specific entries (real hostnames, IPs, usernames)
+# belong directly in ~/.ssh/config itself, ABOVE the Include line -- never
+# in this repo, since ssh_config resolves each parameter to its FIRST
+# match, so specific Host blocks must appear before this catch-all to win.
+#
+# Deliberately does not pin Ciphers/KexAlgorithms/MACs -- OpenSSH's
+# compiled-in defaults are already strong and get updated with the OS;
+# hardcoding a list here would only go stale and risk breaking compatibility
+# down the line.
+
+Host *
+  AddKeysToAgent yes
+  IdentitiesOnly yes
+  HashKnownHosts yes
+  ServerAliveInterval 60
+  ServerAliveCountMax 3
+  ControlMaster auto
+  ControlPath ~/.ssh/sockets/%r@%h-%p
+  ControlPersist 10m

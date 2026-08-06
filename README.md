@@ -22,6 +22,11 @@ dotfiles/
 │       ├── bindings.conf        # pane splits/nav, reload binding
 │       ├── statusbar.conf       # status bar styling
 │       └── plugins.conf         # TPM plugin list (tpm/sensible/resurrect/continuum/yank)
+├── ssh/
+│   ├── setup.sh                # client-side: Include line in ~/.ssh/config, perms (safe, run by install.sh)
+│   ├── ssh_config               # client hardening defaults, included via ~/.ssh/config
+│   ├── harden-server.sh        # server-side hardening (opt-in, NOT run by install.sh -- see below)
+│   └── sshd_hardening.conf      # drop-in installed to /etc/ssh/sshd_config.d/ by harden-server.sh
 └── zsh/
     ├── zshrc                       # main config (becomes ~/.zshrc via symlink)
     ├── aliases/
@@ -53,6 +58,9 @@ git clone <this-repo-url> ~/dotfiles    # or scp/rsync the folder over
 exec zsh
 ```
 
+(`gh` doesn't need an apt install — `git/setup.sh` fetches its binary
+directly, same as git-lfs.)
+
 `install.sh` is idempotent — re-run it any time (e.g. after pulling updates)
 and it will skip anything already installed. `tmux` is optional: if it's not
 installed when `install.sh` runs, the tmux step is skipped (with a note)
@@ -81,7 +89,9 @@ real terminal — same reason `sudo` itself needs one. What it does:
    they don't already have one there, so re-running never clobbers a user's
    own edits to their copy.
 4. Runs `install.sh` as that user (Oh My Zsh, plugins, `~/.zshrc` symlink,
-   `git/setup.sh`).
+   `git/setup.sh`, `tmux/setup.sh`, `ssh/setup.sh`). Server-side SSH
+   hardening is never run automatically for a new user, same as for you —
+   see the SSH section below.
 
 Each new user gets their own copy of the repo, so they can diverge from
 yours independently, and their own git identity (see below) — nothing here
@@ -121,6 +131,8 @@ script is tied to a specific person — sets:
   `rerere.enabled=true`.
 - **git-lfs**: downloaded straight from the GitHub release (no `sudo`
   needed) into `~/.local/bin`, then `git lfs install`.
+- **GitHub CLI (`gh`)**: same no-`sudo` release-binary approach, into
+  `~/.local/bin`. Doesn't run `gh auth login` for you — do that yourself.
 - **Global ignore/attributes**: points `core.excludesfile` /
   `core.attributesfile` at `gitignore_global` / `gitattributes_global` in
   this repo. Only OS/editor cruft (`.DS_Store`, `*.swp`, `.idea/`, ...) and
@@ -179,3 +191,49 @@ Detach with the usual `<prefix> d` — Claude Code keeps running in the
 background (including through an SSH disconnect), and `claude-tmux` from any
 terminal picks the same session back up. Other tmux shortcuts: `tm` (tmux),
 `tma <name>` (attach), `tml` (list sessions), `tmk <name>` (kill a session).
+
+## SSH setup (`ssh/`)
+
+Client and server hardening are split into two separate scripts with very
+different risk levels.
+
+### Client (`ssh/setup.sh`) — run automatically by `install.sh`
+
+Safe: runs as your normal user, no root, nothing here can lock you out.
+
+- Sets `~/.ssh` to `700` and `~/.ssh/config` to `600`.
+- Appends `Include <repo>/ssh/ssh_config` to the **end** of `~/.ssh/config`
+  (creating it if missing) — appended rather than prepended because
+  `ssh_config` resolves each parameter to its *first* match, so any
+  Host-specific blocks you add yourself must stay ahead of this catch-all
+  default, not get pushed after it. Idempotent: won't duplicate the line on
+  re-run, and never touches Host blocks you've added.
+- `ssh/ssh_config` itself sets `AddKeysToAgent`, `IdentitiesOnly`,
+  `HashKnownHosts`, keepalive settings, and connection multiplexing
+  (`ControlMaster`/`ControlPersist`, socket dir created at
+  `~/.ssh/sockets`). No real hostnames/IPs ever belong in this repo — those
+  go directly in your local `~/.ssh/config`, above the Include line.
+
+### Server (`ssh/harden-server.sh`) — opt-in only, run it yourself
+
+**Not** run by `install.sh`. Needs root, and a wrong sshd setting can lock
+you out of remote access to the machine — that's exactly the kind of action
+this repo's automation intentionally stays away from.
+
+```bash
+sudo ~/dotfiles/ssh/harden-server.sh
+```
+
+Installs `ssh/sshd_hardening.conf` to
+`/etc/ssh/sshd_config.d/99-dotfiles-hardening.conf`, validates it with
+`sshd -t` before touching the live service, and rolls back automatically if
+validation fails. Sets `PermitRootLogin no`, `MaxAuthTries 3`,
+`LoginGraceTime 30`, client-alive timeouts, and disables X11/agent
+forwarding.
+
+**Deliberately leaves `PasswordAuthentication` alone.** On this machine,
+`~/.ssh/authorized_keys` was empty when this was built — disabling password
+auth with no key installed would have locked out all remote access. The
+line is in `ssh/sshd_hardening.conf`, commented out, with instructions:
+once you've added a key to `authorized_keys` and confirmed key-based login
+works from another terminal, uncomment it and re-run the script.

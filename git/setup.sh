@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Git identity, sane defaults, git-lfs, and SSH commit/tag signing.
+# Git identity, sane defaults, git-lfs, GitHub CLI, and SSH commit/tag signing.
 # Safe to re-run. Called from ../install.sh, but can be run standalone too.
 #
 # Identity is never hardcoded here. Resolution order for each of name/email:
@@ -13,6 +13,7 @@ set -euo pipefail
 
 GIT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 LFS_VERSION="3.7.1"
+GH_VERSION="2.97.0"
 SIGNING_KEY="${SIGNING_KEY:-$HOME/.ssh/id_ed25519.pub}"
 
 # Up front, not just after installing: makes the git-lfs presence check below
@@ -71,6 +72,21 @@ else
   echo "    already installed, skipping"
 fi
 git lfs install
+
+echo "==> GitHub CLI (gh)"
+if ! command -v gh >/dev/null 2>&1; then
+  mkdir -p "$HOME/.local/bin"
+  tmpdir=$(mktemp -d)
+  curl -fsSL -o "$tmpdir/gh.tar.gz" \
+    "https://github.com/cli/cli/releases/download/v${GH_VERSION}/gh_${GH_VERSION}_linux_amd64.tar.gz"
+  tar xzf "$tmpdir/gh.tar.gz" -C "$tmpdir"
+  cp "$tmpdir/gh_${GH_VERSION}_linux_amd64/bin/gh" "$HOME/.local/bin/gh"
+  chmod +x "$HOME/.local/bin/gh"
+  rm -rf "$tmpdir"
+else
+  echo "    already installed, skipping"
+fi
+echo "    run 'gh auth login' to authenticate (not done automatically)"
 
 echo "==> SSH commit/tag signing"
 if [ -z "$GIT_EMAIL" ]; then

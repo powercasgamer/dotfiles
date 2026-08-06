@@ -54,5 +54,10 @@ else
   echo "    just run: sudo apt install -y tmux && ~/dotfiles/tmux/setup.sh"
 fi
 
+echo "==> SSH client config"
+"$DOTFILES_DIR/ssh/setup.sh"
+echo "    (server-side hardening is separate and NOT run automatically --"
+echo "    see ssh/harden-server.sh)"
+
 echo "==> Done. Start a new zsh session with: exec zsh"
 echo "    To make zsh your login shell: chsh -s \$(command -v zsh)"
