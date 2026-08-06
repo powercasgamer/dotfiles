@@ -9,6 +9,11 @@ GIT_EMAIL="cas@mizule.dev"
 LFS_VERSION="3.7.1"
 SIGNING_KEY="$HOME/.ssh/id_ed25519.pub"
 
+# Up front, not just after installing: makes the git-lfs presence check below
+# reliable even when this script is run directly (bash git/setup.sh) in a
+# shell that hasn't sourced .bashrc/.zshrc yet, so ~/.local/bin isn't on PATH.
+export PATH="$HOME/.local/bin:$PATH"
+
 echo "==> Git identity & defaults"
 git config --global user.name "$GIT_NAME"
 git config --global user.email "$GIT_EMAIL"
@@ -36,7 +41,6 @@ if ! command -v git-lfs >/dev/null 2>&1; then
 else
   echo "    already installed, skipping"
 fi
-export PATH="$HOME/.local/bin:$PATH"
 git lfs install
 
 echo "==> SSH commit/tag signing"
