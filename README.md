@@ -53,8 +53,10 @@ terminal for the password prompt).
 ## Creating a new user with this setup already applied
 
 ```bash
-sudo ~/dotfiles/new-user.sh <username>              # prompts for a password
+sudo ~/dotfiles/new-user.sh <username>              # prompts for a password and git identity
 sudo ~/dotfiles/new-user.sh <username> --no-password # creates the account locked instead
+sudo ~/dotfiles/new-user.sh <username> \
+  --git-name "Their Name" --git-email "them@example.com"  # skip the git identity prompt too
 ```
 
 Must be run as root (it calls `useradd`/`apt-get`/`passwd`), so it needs a
@@ -71,9 +73,10 @@ real terminal — same reason `sudo` itself needs one. What it does:
    `git/setup.sh`).
 
 Each new user gets their own copy of the repo, so they can diverge from
-yours independently. Their SSH signing key won't exist yet (private keys are
-never copied by this repo) — `git/setup.sh` detects that and just skips
-signing setup with instructions, same as on a fresh machine.
+yours independently, and their own git identity (see below) — nothing here
+is tied to your name/email. Their SSH signing key won't exist yet (private
+keys are never copied by this repo) — `git/setup.sh` detects that and just
+skips signing setup with instructions, same as on a fresh machine.
 
 ## Making changes
 
@@ -92,10 +95,16 @@ commands green (valid) or red (invalid/unknown) as you type them.
 
 ## Git setup (`git/setup.sh`)
 
-Run automatically by `install.sh`, or standalone any time. Sets:
+Run automatically by `install.sh`, or standalone any time. Nothing in this
+script is tied to a specific person — sets:
 
-- **Identity**: `user.name` / `user.email` (fixed values in the script, not
-  derived from anything on the machine).
+- **Identity**: `user.name` / `user.email`. Never hardcoded. Resolved in
+  order: `$GIT_NAME`/`$GIT_EMAIL` env vars (for scripted use, e.g.
+  `new-user.sh --git-name/--git-email`) → whatever's already configured
+  globally (so re-running this script never re-prompts or overwrites your
+  choice) → an interactive prompt, if stdin is a TTY. If none of those apply
+  (non-interactive, nothing set, no env vars) identity and signing setup are
+  skipped with an explanation instead of guessing.
 - **Defaults**: `init.defaultBranch=main`, `pull.rebase=false` (merge on
   divergent pull), `push.autoSetupRemote=true`, `core.editor=nano`,
   `rerere.enabled=true`.

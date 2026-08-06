@@ -1,13 +1,19 @@
 #!/usr/bin/env bash
 # Git identity, sane defaults, git-lfs, and SSH commit/tag signing.
 # Safe to re-run. Called from ../install.sh, but can be run standalone too.
+#
+# Identity is never hardcoded here. Resolution order for each of name/email:
+#   1. $GIT_NAME / $GIT_EMAIL env vars (for scripting, e.g. new-user.sh)
+#   2. an already-configured global git user.name/user.email (left alone --
+#      re-running this script won't re-prompt or overwrite your choice)
+#   3. an interactive prompt (only if stdin is a TTY)
+# If none of those apply (non-interactive, nothing set, no env var), identity
+# and signing setup are skipped with an explanation rather than guessing.
 set -euo pipefail
 
 GIT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-GIT_NAME="powercas_gamer"
-GIT_EMAIL="cas@mizule.dev"
 LFS_VERSION="3.7.1"
-SIGNING_KEY="$HOME/.ssh/id_ed25519.pub"
+SIGNING_KEY="${SIGNING_KEY:-$HOME/.ssh/id_ed25519.pub}"
 
 # Up front, not just after installing: makes the git-lfs presence check below
 # reliable even when this script is run directly (bash git/setup.sh) in a
@@ -15,8 +21,31 @@ SIGNING_KEY="$HOME/.ssh/id_ed25519.pub"
 export PATH="$HOME/.local/bin:$PATH"
 
 echo "==> Git identity & defaults"
-git config --global user.name "$GIT_NAME"
-git config --global user.email "$GIT_EMAIL"
+GIT_NAME="${GIT_NAME:-$(git config --global user.name || true)}"
+GIT_EMAIL="${GIT_EMAIL:-$(git config --global user.email || true)}"
+
+if [ -z "$GIT_NAME" ] || [ -z "$GIT_EMAIL" ]; then
+  if [ -t 0 ]; then
+    while [ -z "$GIT_NAME" ]; do
+      read -rp "Git user.name (e.g. a display name, not necessarily your legal name): " GIT_NAME
+    done
+    while [ -z "$GIT_EMAIL" ]; do
+      read -rp "Git user.email: " GIT_EMAIL
+    done
+  else
+    echo "    no git identity configured and not running interactively -- skipping"
+    echo "    identity & signing setup. Set \$GIT_NAME/\$GIT_EMAIL and re-run, or"
+    echo "    run 'git config --global user.name/user.email' yourself first."
+    GIT_NAME=""
+    GIT_EMAIL=""
+  fi
+fi
+
+if [ -n "$GIT_NAME" ] && [ -n "$GIT_EMAIL" ]; then
+  git config --global user.name "$GIT_NAME"
+  git config --global user.email "$GIT_EMAIL"
+fi
+
 git config --global init.defaultBranch main
 git config --global pull.rebase false
 git config --global push.autoSetupRemote true
@@ -44,7 +73,9 @@ fi
 git lfs install
 
 echo "==> SSH commit/tag signing"
-if [ -f "$SIGNING_KEY" ]; then
+if [ -z "$GIT_EMAIL" ]; then
+  echo "    skipped -- no git identity configured (see above)"
+elif [ -f "$SIGNING_KEY" ]; then
   git config --global gpg.format ssh
   git config --global user.signingkey "$SIGNING_KEY"
   git config --global commit.gpgsign true
