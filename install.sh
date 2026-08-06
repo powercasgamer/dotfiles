@@ -43,5 +43,8 @@ if [ -e "$HOME/.zshrc" ] && [ ! -L "$HOME/.zshrc" ]; then
 fi
 ln -sf "$DOTFILES_DIR/zsh/zshrc" "$HOME/.zshrc"
 
+echo "==> Git config, git-lfs, SSH signing"
+"$DOTFILES_DIR/git/setup.sh"
+
 echo "==> Done. Start a new zsh session with: exec zsh"
 echo "    To make zsh your login shell: chsh -s \$(command -v zsh)"
