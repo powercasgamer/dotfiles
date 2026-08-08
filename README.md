@@ -30,6 +30,9 @@ dotfiles/
 ├── docker/
 │   ├── setup.sh                # installs Docker Engine + Compose plugin (opt-in, NOT run by install.sh)
 │   └── daemon.json              # daemon hardening, installed to /etc/docker/daemon.json
+├── cleanup/
+│   ├── cleanup.sh               # the actual cleanup logic; safe to run by hand, supports --dry-run
+│   └── setup.sh                 # installs a weekly systemd timer for it (opt-in, NOT run by install.sh)
 └── zsh/
     ├── zshrc                       # main config (becomes ~/.zshrc via symlink)
     ├── aliases/
@@ -75,7 +78,8 @@ terminal for the password prompt).
 
 Docker is also opt-in and not part of `install.sh` (it needs root for a
 system package + daemon, unlike everything else here) — see the Docker
-section below.
+section below. Same for the storage cleanup timer — see the Cleanup section
+below.
 
 ## Creating a new user with this setup already applied
 
@@ -292,3 +296,70 @@ the old standalone `docker-compose` binary is deprecated upstream.
 `zsh/aliases/docker/aliases.zsh` adds a `docker-compose` shell alias for
 muscle memory (`d`, `dc`, `dps`, `dcup`/`dcdown`, etc.), though it won't
 help non-interactive scripts that call the literal `docker-compose` binary.
+
+## Cleanup (`cleanup/`)
+
+Reclaims disk space on a schedule: old Docker containers/images/build
+cache/oversized container logs, the systemd journal, apt's package cache,
+stale rotated logs in `/var/log` plus a configurable list of other service
+log directories (`service-logs.txt` — redis, mongodb, nats, influxdb,
+questdb, clickhouse, mysql/postgres, and more; anything not actually
+installed is silently skipped), and the trash + thumbnail cache of a real
+user. Everything is age-gated and only ever touches stopped/unused/rotated
+things — never running containers, in-use images, or active log files
+(the one opt-in exception being `LOG_TRUNCATE_UNROTATED`, off by default).
+
+Opt-in only, like `docker/setup.sh` — the parts that touch apt, the system
+journal, and `/var/log` need root, so it's never run automatically by
+`install.sh`.
+
+```bash
+~/dotfiles/cleanup/cleanup.sh --dry-run   # see what it would do, no root needed
+sudo ~/dotfiles/cleanup/setup.sh [username]   # installs the weekly timer
+```
+
+`username` (whose trash/thumbnail cache gets cleaned) defaults to
+`$SUDO_USER` if not given, same convention as `docker/setup.sh`.
+`setup.sh` installs `dotfiles-cleanup.service` + `.timer` to
+`/etc/systemd/system/`, running as root every Sunday at 03:30 (±30m
+jitter, `Persistent=true` so a missed run — e.g. laptop asleep — fires on
+next boot).
+
+`cleanup.sh` itself is privilege-aware and safe to run directly at any
+time, with or without root:
+
+- **Docker** (any user in the `docker` group, or root): prunes stopped
+  containers older than 7 days, images unused by any container older than
+  30 days, build cache older than 7 days, and anonymous unused volumes
+  (never named/attached volumes). Root additionally truncates any
+  container's JSON log file (whatever image it's running — no name
+  matching involved) past 500MB, which matters for long-running containers
+  that predate `docker/daemon.json`'s log rotation cap.
+- **journald, apt, `/var/log` + `service-logs.txt`** (root only — skipped
+  with a note otherwise): vacuums the journal to 14 days, runs
+  `apt-get autoremove` + `autoclean`, and deletes rotated/compressed logs
+  (`*.gz`, `*.xz`, `*.log.N`, `*.old`, dateext-style `*.log-YYYYMMDD`)
+  older than 60 days from `/var/log` and every existing path in
+  `cleanup/service-logs.txt`. That file is a plain `name path` list (same
+  idea as `../github-sync/repos.txt`) pre-populated with the default log
+  dirs for redis, mongodb, mysql/mariadb, postgresql, clickhouse-server,
+  influxdb, elasticsearch, rabbitmq, nats, and questdb — add a line for
+  anything else; entries for services not installed here are just no-ops.
+  Some of those (NATS, QuestDB, InfluxDB run without an external
+  `log_file`) don't rotate their own logs at all, so nothing ever gets
+  deleted there by default — set `LOG_TRUNCATE_UNROTATED=1` to also
+  truncate-to-zero (copytruncate-style — safe with an open fd, but
+  discards history rather than archiving it) any `*.log` in those
+  directories past `LOG_TRUNCATE_MB` (default 200).
+- **Trash + thumbnails** (any user, targets `$TARGET_USER`'s home):
+  empties `~/.local/share/Trash` items and `~/.cache/thumbnails` entries
+  older than 30 days.
+
+All the age/size thresholds are env vars (`DOCKER_CONTAINER_AGE`,
+`DOCKER_IMAGE_AGE`, `DOCKER_BUILDCACHE_AGE`, `DOCKER_LOG_MAX_MB`,
+`JOURNAL_RETENTION`, `LOG_AGE_DAYS`, `LOG_TRUNCATE_UNROTATED`,
+`LOG_TRUNCATE_MB`, `SERVICE_LOGS_FILE`, `TRASH_AGE_DAYS`) — see the
+comment header in `cleanup.sh` for defaults. Check logs with
+`journalctl -u dotfiles-cleanup --since -30d`, run it on demand with
+`sudo systemctl start dotfiles-cleanup.service`, and check the next
+scheduled run with `systemctl list-timers dotfiles-cleanup.timer`.

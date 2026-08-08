@@ -1,0 +1,30 @@
+# Extra log directories to sweep, one "name path" pair per line (whitespace
+# separated). Anything not present on this machine is silently skipped, so
+# it's safe to keep every entry below regardless of what's actually
+# installed here -- add a line for anything else you run.
+#
+# These are the *default* paths from each project's official Debian/apt
+# package or systemd unit. If you installed one from a tarball, Docker
+# volume, or custom -d/--data-dir flag, fix the path to match.
+#
+# Only rotated/compressed files are touched here (*.gz/*.xz/*.log.N/*.old/
+# dateext-style), same safe rule as the main /var/log sweep -- see
+# LOG_TRUNCATE_UNROTATED in cleanup.sh for services below that don't
+# rotate their own logs at all (NATS, QuestDB, InfluxDB when run without
+# an external log_file/logrotate setup).
+
+redis            /var/log/redis
+mongodb          /var/log/mongodb
+mysql            /var/log/mysql
+mariadb          /var/log/mysql
+postgresql       /var/log/postgresql
+clickhouse-server /var/log/clickhouse-server
+influxdb         /var/log/influxdb
+elasticsearch    /var/log/elasticsearch
+rabbitmq         /var/log/rabbitmq
+
+# No standard Debian package/log convention -- these commonly log to
+# stdout/journal unless explicitly pointed at a file. Paths below match
+# them only if you configured that; otherwise these lines are just no-ops.
+nats             /var/log/nats
+questdb          /var/lib/questdb/log

@@ -67,5 +67,9 @@ else
   echo "    sudo ~/dotfiles/docker/setup.sh"
 fi
 
+echo "==> Storage cleanup"
+echo "    not installed (needs root, so not run automatically here):"
+echo "    sudo ~/dotfiles/cleanup/setup.sh"
+
 echo "==> Done. Start a new zsh session with: exec zsh"
 echo "    To make zsh your login shell: chsh -s \$(command -v zsh)"
