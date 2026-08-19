@@ -33,6 +33,8 @@ dotfiles/
 ├── cleanup/
 │   ├── cleanup.sh               # the actual cleanup logic; safe to run by hand, supports --dry-run
 │   └── setup.sh                 # installs a weekly systemd timer for it (opt-in, NOT run by install.sh)
+├── python/
+│   └── setup.sh                  # installs python3 + pip + venv + dev + pipx (opt-in, NOT run by install.sh)
 └── zsh/
     ├── zshrc                       # main config (becomes ~/.zshrc via symlink)
     ├── aliases/
@@ -78,8 +80,8 @@ terminal for the password prompt).
 
 Docker is also opt-in and not part of `install.sh` (it needs root for a
 system package + daemon, unlike everything else here) — see the Docker
-section below. Same for the storage cleanup timer — see the Cleanup section
-below.
+section below. Same for the storage cleanup timer and the Python install —
+see the Cleanup and Python sections below.
 
 ## Creating a new user with this setup already applied
 
@@ -363,3 +365,22 @@ comment header in `cleanup.sh` for defaults. Check logs with
 `journalctl -u dotfiles-cleanup --since -30d`, run it on demand with
 `sudo systemctl start dotfiles-cleanup.service`, and check the next
 scheduled run with `systemctl list-timers dotfiles-cleanup.timer`.
+
+## Python setup (`python/setup.sh`)
+
+Opt-in only, like `docker/setup.sh` — needs root (apt), so it's never run
+automatically by `install.sh`.
+
+```bash
+sudo ~/dotfiles/python/setup.sh
+```
+
+Installs `python3`, `python3-pip`, `python3-venv`, `python3-dev`, and
+`pipx` via apt — skips the install entirely if all five are already
+present, so it's safe to re-run any time. `python3` itself ships by
+default on most Ubuntu installs, but `pip`/`venv`/`pipx` don't, which is
+why this exists as a real script rather than a one-line dependency check
+like `zsh`/`git`/`curl` at the top of `install.sh`. `~/.local/bin` (where
+`pip install --user` and `pipx install` put scripts) is already on `PATH`
+via `zsh/exports/core/exports.zsh`, conditional on the directory existing
+— nothing further to configure after this runs.
