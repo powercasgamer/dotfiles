@@ -43,6 +43,21 @@ if [ -e "$HOME/.zshrc" ] && [ ! -L "$HOME/.zshrc" ]; then
 fi
 ln -sf "$DOTFILES_DIR/zsh/zshrc" "$HOME/.zshrc"
 
+echo "==> Machine-local overrides / secrets"
+if [ ! -e "$HOME/.zshrc.local" ]; then
+  cp "$DOTFILES_DIR/zsh/zshrc.local.example" "$HOME/.zshrc.local"
+  echo "    created ~/.zshrc.local from template"
+else
+  echo "    ~/.zshrc.local already exists, leaving it as-is"
+fi
+if [ ! -e "$HOME/.zshrc.secrets" ]; then
+  cp "$DOTFILES_DIR/zsh/zshrc.secrets.example" "$HOME/.zshrc.secrets"
+  chmod 600 "$HOME/.zshrc.secrets"
+  echo "    created ~/.zshrc.secrets from template (chmod 600)"
+else
+  echo "    ~/.zshrc.secrets already exists, leaving it as-is"
+fi
+
 echo "==> Git config, git-lfs, SSH signing"
 "$DOTFILES_DIR/git/setup.sh"
 

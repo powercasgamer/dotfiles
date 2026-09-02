@@ -41,6 +41,8 @@ dotfiles/
 │   └── setup.sh                  # installs python3 + pip + venv + dev + pipx (opt-in, NOT run by install.sh)
 └── zsh/
     ├── zshrc                       # main config (becomes ~/.zshrc via symlink)
+    ├── zshrc.local.example         # template -> ~/.zshrc.local (host tweaks, not tracked)
+    ├── zshrc.secrets.example       # template -> ~/.zshrc.secrets (tokens/keys, not tracked, chmod 600)
     ├── aliases/
     │   ├── git/aliases.zsh         # g, gs, ga, gc, gp, gco, gl...
     │   ├── ls/aliases.zsh          # ls/ll/lt, grep colors
@@ -129,8 +131,16 @@ Edit files under `zsh/` directly — `~/.zshrc` is a symlink into this repo, so
 changes are picked up immediately with `reload` (an alias for
 `source ~/.zshrc`, defined in `aliases/misc/aliases.zsh`).
 
-Anything machine-specific (secrets, host-only PATH tweaks) goes in
-`~/.zshrc.local`, which is sourced last and NOT tracked by this repo.
+Anything machine-specific goes outside this repo, in two files sourced last
+by `zsh/zshrc` and NOT tracked here — `install.sh` creates both from
+templates (`zsh/zshrc.local.example` / `zsh/zshrc.secrets.example`) on first
+run, then leaves them alone on every re-run:
+
+- `~/.zshrc.local` -- host-only tweaks: PATH additions, aliases, prompt
+  overrides. Nothing sensitive.
+- `~/.zshrc.secrets` -- actual credentials (Gradle/Sentry/npm tokens, API
+  keys, ...). Created `chmod 600`. Kept separate from `.local` so it's
+  obvious at a glance what's sensitive.
 
 ## Suggestions plugin
 

@@ -1,0 +1,17 @@
+# Example ~/.zshrc.local -- copy to ~/.zshrc.local and edit.
+# This file is sourced last by zsh/zshrc and is NOT tracked by this repo
+# (it lives outside zsh/, in your home directory).
+#
+# Use it for host-specific tweaks that aren't secrets -- PATH additions
+# only present on this machine, aliases you don't want everywhere, prompt
+# overrides, etc. For credentials/tokens, use ~/.zshrc.secrets instead
+# (see zsh/zshrc.secrets.example).
+
+# --- example: extra PATH only on this box ---
+# [ -d "/opt/company-tool/bin" ] && export PATH="/opt/company-tool/bin:$PATH"
+
+# --- example: work-only alias ---
+# alias vpn="sudo openconnect vpn.example.com"
+
+# --- example: override a default from zsh/exports/core/exports.zsh ---
+# export EDITOR="vim"

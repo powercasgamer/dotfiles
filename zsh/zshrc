@@ -36,5 +36,9 @@ for file in "$HOME"/dotfiles/zsh/{exports,functions,aliases}/**/*.zsh(N); do
   source "$file"
 done
 
-# --- machine-local overrides (not tracked, safe to keep secrets/host-specific tweaks here) ---
+# --- machine-local overrides (not tracked, safe for host-specific tweaks) ---
 [ -r "$HOME/.zshrc.local" ] && source "$HOME/.zshrc.local"
+
+# --- secrets / auth tokens (not tracked; kept separate from .local so it's
+# obvious what's sensitive and easy to chmod 600 on its own) ---
+[ -r "$HOME/.zshrc.secrets" ] && source "$HOME/.zshrc.secrets"
