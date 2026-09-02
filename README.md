@@ -49,7 +49,7 @@ dotfiles/
     ├── exports/
     │   └── core/exports.zsh        # locale, EDITOR, history size, PATH, less colors
     └── functions/
-        └── core/functions.zsh      # mkcd, bak, psgrep
+        └── core/functions.zsh      # mkcd, bak, psgrep, bsha256/bsha512, rsync-copy
 ```
 
 `zshrc` sources every `*.zsh` file found anywhere under `aliases/`,

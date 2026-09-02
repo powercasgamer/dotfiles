@@ -14,3 +14,19 @@ bak() {
 psgrep() {
   ps aux | grep -i "$1" | grep -v grep
 }
+
+# base64-encoded sha256 digest of a file (e.g. for SRI hashes)
+bsha256() {
+  openssl dgst -sha256 -binary "$1" | base64
+}
+
+# base64-encoded sha512 digest of a file
+bsha512() {
+  openssl dgst -sha512 -binary "$1" | base64
+}
+
+# rsync copy with sane defaults: archive, verbose, compressed, progress, human-readable sizes
+# e.g. rsync-copy ./local-dir/ user@host:/remote/dir/
+rsync-copy() {
+  rsync -avzPh "$@"
+}
