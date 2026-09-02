@@ -19,7 +19,6 @@ plugins=(
   git
   sudo
   command-not-found
-  colored-man-pages
   extract
   z
   zsh-completions
