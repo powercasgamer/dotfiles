@@ -47,7 +47,8 @@ dotfiles/
     │   ├── docker/aliases.zsh      # d, dc, dps, dcup/dcdown, docker-compose compat
     │   └── misc/aliases.zsh        # reload, zshconfig, dotfiles
     ├── exports/
-    │   └── core/exports.zsh        # locale, EDITOR, history size, PATH, less colors
+    │   ├── core/exports.zsh        # locale, EDITOR, history size, PATH, less colors
+    │   └── ssh/ssh-agent.zsh       # starts/reuses one ssh-agent, loads the git signing key
     └── functions/
         └── core/functions.zsh      # mkcd, bak, psgrep, bsha256/bsha512, rsync-copy
 ```
@@ -158,6 +159,14 @@ script is tied to a specific person — sets:
   `gpg.format=ssh`, points `user.signingkey` at it, turns on
   `commit.gpgsign` / `tag.gpgsign`, and writes `~/.ssh/allowed_signers` so
   `git log --show-signature` / `git verify-commit` work locally.
+
+Signing itself uses `gpg.format=ssh`, so it's ssh-agent that matters here,
+not a real GPG agent — `zsh/exports/ssh/ssh-agent.zsh` starts one ssh-agent
+per machine (reused across every shell/tmux pane via `~/.ssh/agent.env`,
+instead of spawning a new one — and losing loaded keys — per terminal) and
+loads `~/.ssh/id_ed25519` into it on the first interactive shell each boot.
+That's also what makes `AddKeysToAgent yes` (`ssh/ssh_config`) work. Without
+it, a passphrase-protected signing key would prompt on every single commit.
 
 **The private half of that keypair is never stored in this repo** — it has
 to already exist on the machine (generate fresh with `ssh-keygen -t ed25519`,
