@@ -47,7 +47,7 @@ dotfiles/
     │   ├── docker/aliases.zsh      # d, dc, dps, dcup/dcdown, docker-compose compat
     │   └── misc/aliases.zsh        # reload, zshconfig, dotfiles
     ├── exports/
-    │   └── core/exports.zsh        # EDITOR, history size, PATH, less colors
+    │   └── core/exports.zsh        # locale, EDITOR, history size, PATH, less colors
     └── functions/
         └── core/functions.zsh      # mkcd, bak, psgrep
 ```
