@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Creates a Linux user (if it doesn't exist yet) and applies the full
 # dotfiles setup to their account: zsh + Oh My Zsh + plugins, aliases,
-# git identity/defaults, git-lfs, SSH commit/tag signing.
+# git identity/defaults, git-lfs, SSH commit/tag signing, SDKMAN.
 #
 # Must run as root (it calls useradd). Safe to re-run for an existing user
 # -- it will not touch a dotfiles copy that's already there, just re-run
@@ -50,7 +50,7 @@ DOTFILES_SRC="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 echo "==> Checking system dependencies"
 MISSING=()
-for cmd in zsh git curl tmux; do
+for cmd in zsh git curl tmux zip unzip; do
   command -v "$cmd" >/dev/null 2>&1 || MISSING+=("$cmd")
 done
 if [ "${#MISSING[@]}" -gt 0 ]; then
@@ -58,7 +58,7 @@ if [ "${#MISSING[@]}" -gt 0 ]; then
   apt-get update -qq
   apt-get install -y "${MISSING[@]}"
 else
-  echo "    zsh, git, curl, tmux already present"
+  echo "    zsh, git, curl, tmux, zip, unzip already present"
 fi
 
 if id "$USERNAME" >/dev/null 2>&1; then

@@ -27,6 +27,8 @@ dotfiles/
 │   ├── ssh_config               # client hardening defaults, included via ~/.ssh/config
 │   ├── harden-server.sh        # server-side hardening (opt-in, NOT run by install.sh -- see below)
 │   └── sshd_hardening.conf      # drop-in installed to /etc/ssh/sshd_config.d/ by harden-server.sh
+├── sdkman/
+│   └── setup.sh                  # installs SDKMAN, a JVM candidate version manager (run by install.sh)
 ├── docker/
 │   ├── setup.sh                # installs Docker Engine + Compose plugin (opt-in, NOT run by install.sh)
 │   └── daemon.json              # daemon hardening, installed to /etc/docker/daemon.json
@@ -48,7 +50,8 @@ dotfiles/
     │   └── misc/aliases.zsh        # reload, zshconfig, dotfiles
     ├── exports/
     │   ├── core/exports.zsh        # locale, EDITOR, history size, PATH, less colors
-    │   └── ssh/ssh-agent.zsh       # starts/reuses one ssh-agent, loads the git signing key
+    │   ├── ssh/ssh-agent.zsh       # starts/reuses one ssh-agent, loads the git signing key
+    │   └── sdkman/sdkman.zsh       # SDKMAN_DIR + sources sdkman-init.sh, if installed
     └── functions/
         └── core/functions.zsh      # mkcd, bak, psgrep, bsha256/bsha512, rsync-copy
 ```
@@ -75,6 +78,8 @@ directly, same as git-lfs.)
 and it will skip anything already installed. `tmux` is optional: if it's not
 installed when `install.sh` runs, the tmux step is skipped (with a note)
 rather than failing the whole script — install `tmux` and re-run any time.
+Same for `zip`/`unzip`, needed by the SDKMAN installer: if either is
+missing, that step is skipped (with a note) instead of failing the script.
 
 To make zsh your login shell: `chsh -s $(command -v zsh)` (needs a real
 terminal for the password prompt).
@@ -261,6 +266,23 @@ auth with no key installed would have locked out all remote access. The
 line is in `ssh/sshd_hardening.conf`, commented out, with instructions:
 once you've added a key to `authorized_keys` and confirmed key-based login
 works from another terminal, uncomment it and re-run the script.
+
+## SDKMAN setup (`sdkman/setup.sh`)
+
+Unprivileged, like `git/setup.sh` and `ssh/setup.sh` — installs into
+`~/.sdkman`, no root needed, so it's run automatically by `install.sh`
+(skipped with instructions if `zip`/`unzip` aren't present — see above).
+
+[SDKMAN](https://sdkman.io) manages versions of Java, Kotlin, Groovy,
+Gradle, Maven, sbt, Scala, and other JVM-ecosystem tools —
+`sdk install java`, `sdk use java 21-tem`, etc. Safe to re-run: skips the
+download if `~/.sdkman/bin/sdkman-init.sh` already exists.
+
+The upstream installer normally appends its init snippet directly onto the
+end of `~/.zshrc`. Since `~/.zshrc` here is a symlink into this tracked
+repo, `sdkman/setup.sh` strips that snippet back out after installing —
+the actual sourcing lives in `zsh/exports/sdkman/sdkman.zsh` instead, loaded
+the same way as every other `exports/*.zsh` file.
 
 ## Docker setup (`docker/setup.sh`)
 

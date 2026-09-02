@@ -59,6 +59,14 @@ echo "==> SSH client config"
 echo "    (server-side hardening is separate and NOT run automatically --"
 echo "    see ssh/harden-server.sh)"
 
+echo "==> SDKMAN"
+if command -v zip >/dev/null 2>&1 && command -v unzip >/dev/null 2>&1; then
+  "$DOTFILES_DIR/sdkman/setup.sh"
+else
+  echo "    zip/unzip not installed (needs root, so not run automatically here):"
+  echo "    sudo apt install -y zip unzip && ~/dotfiles/sdkman/setup.sh"
+fi
+
 echo "==> Docker"
 if command -v docker >/dev/null 2>&1; then
   echo "    already installed"
