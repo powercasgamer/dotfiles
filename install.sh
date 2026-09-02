@@ -67,6 +67,9 @@ else
   echo "    sudo apt install -y zip unzip && ~/dotfiles/sdkman/setup.sh"
 fi
 
+echo "==> nvm"
+"$DOTFILES_DIR/nvm/setup.sh"
+
 echo "==> Docker"
 if command -v docker >/dev/null 2>&1; then
   echo "    already installed"

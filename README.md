@@ -29,6 +29,8 @@ dotfiles/
 │   └── sshd_hardening.conf      # drop-in installed to /etc/ssh/sshd_config.d/ by harden-server.sh
 ├── sdkman/
 │   └── setup.sh                  # installs SDKMAN, a JVM candidate version manager (run by install.sh)
+├── nvm/
+│   └── setup.sh                  # installs nvm, a Node.js version manager (run by install.sh)
 ├── docker/
 │   ├── setup.sh                # installs Docker Engine + Compose plugin (opt-in, NOT run by install.sh)
 │   └── daemon.json              # daemon hardening, installed to /etc/docker/daemon.json
@@ -51,7 +53,8 @@ dotfiles/
     ├── exports/
     │   ├── core/exports.zsh        # locale, EDITOR, history size, PATH, less colors
     │   ├── ssh/ssh-agent.zsh       # starts/reuses one ssh-agent, loads the git signing key
-    │   └── sdkman/sdkman.zsh       # SDKMAN_DIR + sources sdkman-init.sh, if installed
+    │   ├── sdkman/sdkman.zsh       # SDKMAN_DIR + sources sdkman-init.sh, if installed
+    │   └── node/nvm.zsh            # NVM_DIR + sources nvm.sh, if installed
     └── functions/
         └── core/functions.zsh      # mkcd, bak, psgrep, bsha256/bsha512, rsync-copy
 ```
@@ -283,6 +286,23 @@ end of `~/.zshrc`. Since `~/.zshrc` here is a symlink into this tracked
 repo, `sdkman/setup.sh` strips that snippet back out after installing —
 the actual sourcing lives in `zsh/exports/sdkman/sdkman.zsh` instead, loaded
 the same way as every other `exports/*.zsh` file.
+
+## nvm setup (`nvm/setup.sh`)
+
+Unprivileged, like `sdkman/setup.sh` — installs into `~/.nvm`, no root
+needed, so it's run automatically by `install.sh`.
+
+[nvm](https://github.com/nvm-sh/nvm) manages versions of Node.js —
+`nvm install --lts`, `nvm use 22`, etc. Safe to re-run: skips the download
+if `~/.nvm/nvm.sh` already exists.
+
+The upstream installer normally detects a shell profile (`~/.zshrc` for a
+zsh login shell) and appends its init snippet directly onto the end of it.
+Since `~/.zshrc` here is a symlink into this tracked repo, `nvm/setup.sh`
+runs it with `PROFILE=/dev/null`, which tells the installer to skip
+touching any profile file at all — the actual sourcing lives in
+`zsh/exports/node/nvm.zsh` instead, loaded the same way as every other
+`exports/*.zsh` file.
 
 ## Docker setup (`docker/setup.sh`)
 
