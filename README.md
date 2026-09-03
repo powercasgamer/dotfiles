@@ -12,6 +12,7 @@ dotfiles/
 │   └── workflows/
 │       ├── lint.yml           # shellcheck on every *.sh, on push/PR
 │       └── docker-build.yml   # builds + smoke-tests java/Dockerfile on change
+├── renovate.json      # Renovate config -- see "Dependency updates" below
 ├── install.sh        # installs Oh My Zsh + plugins, symlinks ~/.zshrc, runs git/setup.sh + tmux/setup.sh
 ├── new-user.sh        # creates a Linux user and bootstraps this whole setup for them
 ├── git/
@@ -170,6 +171,21 @@ run, then leaves them alone on every re-run:
   `java -version` / `--list-modules` against it whenever that file changes.
   Exists because a `jlink --add-modules` typo in that file once only
   surfaced at build/run time -- this catches it in CI instead.
+
+## Dependency updates (Renovate)
+
+`renovate.json` is picked up by the [Renovate GitHub
+App](https://github.com/apps/renovate) -- install it on this repo (once,
+from that link) and it opens PRs itself; no workflow file, secret, or PAT
+needed here.
+
+It extends Renovate's `config:recommended` and additionally tracks
+`NVM_VERSION` in `nvm/setup.sh` via a custom regex manager (the one pinned
+version outside a Dockerfile/GitHub Actions context Renovate understands
+natively). `java/Dockerfile`'s base images and every
+`uses: owner/action@version` in `.github/workflows/*.yml` are covered
+automatically. bun/pnpm/uv/SDKMAN's installers always fetch latest, so
+there's no pinned version in those scripts for Renovate to bump.
 
 ## Suggestions plugin
 
