@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 # Installs SDKMAN (https://sdkman.io) -- a candidate version manager for the
 # JVM ecosystem (Java, Kotlin, Groovy, Gradle, Maven, sbt, Scala, ...) --
-# then installs the Maven and Maven Daemon (mvnd) candidates through it.
-# Unlike nvm/bun/pnpm/uv, SDKMAN itself doesn't ship a build tool, so those
-# two are installed explicitly rather than left as a manual `sdk install`.
+# then installs the Maven, Maven Daemon (mvnd), and Gradle candidates
+# through it. Unlike nvm/bun/pnpm/uv, SDKMAN itself doesn't ship a build
+# tool, so these are installed explicitly rather than left as a manual
+# `sdk install`.
 #
 # Unprivileged (installs into ~/.sdkman), so unlike docker/setup.sh,
 # cleanup/setup.sh and python/setup.sh this runs automatically from
@@ -16,8 +17,8 @@
 # exports/*.zsh file -- see the zshrc glob), and this script strips whatever
 # the installer appended to zshrc so the tracked file stays clean.
 #
-# Safe to re-run: skips the download if SDKMAN, maven, or mvnd are already
-# installed.
+# Safe to re-run: skips the download for any of SDKMAN, maven, mvnd, or
+# gradle that's already installed.
 set -euo pipefail
 
 echo "==> SDKMAN"
@@ -48,7 +49,7 @@ if [ -f "$ZSHRC" ] && grep -q 'sdkman-init.sh' "$ZSHRC"; then
   done
 fi
 
-echo "==> Maven + Maven Daemon (mvnd)"
+echo "==> Maven + Maven Daemon (mvnd) + Gradle"
 # sdkman-init.sh and sdk's shell functions aren't written for `set -u`/`-e`
 # (e.g. they reference $ZSH_VERSION unguarded) -- relax both around them and
 # check exit statuses ourselves instead of letting a benign nonzero return
@@ -76,5 +77,6 @@ install_candidate() {
 
 install_candidate maven
 install_candidate mvnd
+install_candidate gradle
 
 echo "==> Done"
