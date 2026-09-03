@@ -331,6 +331,14 @@ touching any profile file at all — the actual sourcing lives in
 `zsh/exports/node/nvm.zsh` instead, loaded the same way as every other
 `exports/*.zsh` file.
 
+`nvm.zsh` lazy-loads: `nvm.sh` runs `nvm use` on every shell startup by
+default (`nvm_auto`), which measured as ~half of total shell startup time
+with no payoff here (nothing uses its `.nvmrc` auto-switch). Instead,
+`nvm`/`node`/`npm`/`npx`/`corepack` are stubbed out; the first call to any
+of them sources the real `nvm.sh` once and replaces the stubs with nvm's
+real functions, so nothing else changes — just no longer paid on every
+new shell.
+
 ## bun setup (`bun/setup.sh`)
 
 Unprivileged, like `sdkman/setup.sh` and `nvm/setup.sh` — installs into
