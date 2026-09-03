@@ -6,12 +6,18 @@
 # No credentials belong here -- see the GPR_USER/GPR_TOKEN block in
 # zsh/zshrc.secrets.example (used via GRADLE_OPTS) for those instead.
 
-# --- Gradle daemon JVM args ---
-# Tune -Xmx to your machine's RAM and workload. UseCompactObjectHeaders
+org.gradle.daemon=true
+org.gradle.cache=true
+org.gradle.caching=true
+org.gradle.tooling.parallel=true
+org.gradle.parallel=true
+org.gradle.configuration-cache=true
+org.gradle.configuration-cache.problems=warn
+org.gradle.configureondemand=true
+# -Xmx: tune to your machine's RAM and workload. UseCompactObjectHeaders
 # (Project Lilliput) needs JDK 24+ -- drop it on an older JDK.
-org.gradle.jvmargs=-Xmx2g -XX:MaxMetaspaceSize=512m -XX:+UseCompactObjectHeaders
-
-# --- other commonly recommended settings (uncomment as wanted) ---
-# org.gradle.parallel=true             # build independent subprojects concurrently
-# org.gradle.caching=true              # reuse task outputs from the build cache
-# org.gradle.configuration-cache=true  # cache the configuration phase itself
+org.gradle.jvmargs=-Xmx4048m -Dfile.encoding=UTF-8 -XX:MaxMetaspaceSize=512m -XX:+UseCompactObjectHeaders
+# File-system watching off -- turn on (or drop this line, it's true by
+# default) unless you have a reason to disable it, e.g. a network/container
+# filesystem where watching is unreliable or noisy.
+org.gradle.vfs.watch=false
