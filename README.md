@@ -31,6 +31,8 @@ dotfiles/
 │   └── setup.sh                  # installs SDKMAN, a JVM candidate version manager (run by install.sh)
 ├── nvm/
 │   └── setup.sh                  # installs nvm, a Node.js version manager (run by install.sh)
+├── uv/
+│   └── setup.sh                  # installs uv, a Python package/venv/tool manager (run by install.sh)
 ├── docker/
 │   ├── setup.sh                # installs Docker Engine + Compose plugin (opt-in, NOT run by install.sh)
 │   └── daemon.json              # daemon hardening, installed to /etc/docker/daemon.json
@@ -38,7 +40,7 @@ dotfiles/
 │   ├── cleanup.sh               # the actual cleanup logic; safe to run by hand, supports --dry-run
 │   └── setup.sh                 # installs a weekly systemd timer for it (opt-in, NOT run by install.sh)
 ├── python/
-│   └── setup.sh                  # installs python3 + pip + venv + dev + pipx (opt-in, NOT run by install.sh)
+│   └── setup.sh                  # installs python3 + python3-dev via apt (opt-in, NOT run by install.sh)
 └── zsh/
     ├── zshrc                       # main config (becomes ~/.zshrc via symlink)
     ├── zshrc.local.example         # template -> ~/.zshrc.local (host tweaks, not tracked)
@@ -314,6 +316,28 @@ touching any profile file at all — the actual sourcing lives in
 `zsh/exports/node/nvm.zsh` instead, loaded the same way as every other
 `exports/*.zsh` file.
 
+## uv setup (`uv/setup.sh`)
+
+Unprivileged, like `sdkman/setup.sh` and `nvm/setup.sh` — installs into
+`~/.local/bin`, no root needed, so it's run automatically by `install.sh`.
+
+[uv](https://docs.astral.sh/uv/) is a single fast binary that replaces
+`pip`, `venv`, and `pipx`: `uv venv` creates virtualenvs, `uv pip install`
+manages packages, `uv run` runs a script with its dependencies resolved
+on the fly, and `uv tool install <pkg>` installs isolated CLI tools the
+way `pipx install` did. It can also manage the Python interpreter itself
+— `uv python install 3.12` — if you'd rather not depend on apt's `python3`
+at all. Safe to re-run: skips the download if `~/.local/bin/uv` already
+exists.
+
+The upstream installer normally appends a PATH snippet directly onto the
+end of `~/.zshrc`. Since `~/.zshrc` here is a symlink into this tracked
+repo, `uv/setup.sh` runs it with `INSTALLER_NO_MODIFY_PATH=1`, which tells
+it to skip touching any profile file at all — it installs `uv`/`uvx`
+straight into `~/.local/bin`, which is already on `PATH` via
+`zsh/exports/core/exports.zsh`, so no dedicated `exports/*.zsh` file is
+needed for it.
+
 ## Docker setup (`docker/setup.sh`)
 
 Opt-in only, like `ssh/harden-server.sh` — needs root (apt repo + packages
@@ -436,12 +460,13 @@ automatically by `install.sh`.
 sudo ~/dotfiles/python/setup.sh
 ```
 
-Installs `python3`, `python3-pip`, `python3-venv`, `python3-dev`, and
-`pipx` via apt — skips the install entirely if all five are already
-present, so it's safe to re-run any time. `python3` itself ships by
-default on most Ubuntu installs, but `pip`/`venv`/`pipx` don't, which is
-why this exists as a real script rather than a one-line dependency check
-like `zsh`/`git`/`curl` at the top of `install.sh`. `~/.local/bin` (where
-`pip install --user` and `pipx install` put scripts) is already on `PATH`
-via `zsh/exports/core/exports.zsh`, conditional on the directory existing
-— nothing further to configure after this runs.
+Installs `python3` and `python3-dev` via apt — skips the install entirely
+if both are already present, so it's safe to re-run any time. `python3`
+itself ships by default on most Ubuntu installs, but not always
+`python3-dev` (needed to build C extensions), which is why this exists as
+a real script rather than a one-line dependency check like `zsh`/`git`/
+`curl` at the top of `install.sh`.
+
+`pip`, `venv`, and `pipx` are deliberately not installed here — see
+[uv setup](#uv-setup-uvsetupsh) above, which `install.sh` runs
+automatically without root and which replaces all three.

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Creates a Linux user (if it doesn't exist yet) and applies the full
 # dotfiles setup to their account: zsh + Oh My Zsh + plugins, aliases,
-# git identity/defaults, git-lfs, SSH commit/tag signing, SDKMAN, nvm.
+# git identity/defaults, git-lfs, SSH commit/tag signing, SDKMAN, nvm, uv.
 #
 # Must run as root (it calls useradd). Safe to re-run for an existing user
 # -- it will not touch a dotfiles copy that's already there, just re-run

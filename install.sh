@@ -98,12 +98,15 @@ echo "    not installed (needs root, so not run automatically here):"
 echo "    sudo ~/dotfiles/cleanup/setup.sh"
 
 echo "==> Python 3"
-if command -v python3 >/dev/null 2>&1 && command -v pip3 >/dev/null 2>&1 && command -v pipx >/dev/null 2>&1; then
+if command -v python3 >/dev/null 2>&1; then
   echo "    already installed"
 else
-  echo "    pip/venv/pipx not installed (needs root, so not run automatically here):"
+  echo "    python3 not installed (needs root, so not run automatically here):"
   echo "    sudo ~/dotfiles/python/setup.sh"
 fi
+
+echo "==> uv"
+"$DOTFILES_DIR/uv/setup.sh"
 
 echo "==> Done. Start a new zsh session with: exec zsh"
 echo "    To make zsh your login shell: chsh -s \$(command -v zsh)"
