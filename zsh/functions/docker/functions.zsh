@@ -1,18 +1,16 @@
-# Run a .jar in an ephemeral Alpine-based JRE container -- no local
+# Run `java` in an ephemeral Alpine-based JRE container -- no local
 # JDK/JRE needed, and nothing lingers after it exits (--rm). Mounts $PWD
-# (not just the jar's directory) as /work so relative paths in the jar's
-# own args resolve the same as running it locally -- only works for
-# jars/paths that live under $PWD. The image is pulled once and cached by
-# docker after that.
+# as /work so relative paths (a jar via -jar, a classpath via -cp, ...)
+# resolve the same as running them locally. The image is pulled once and
+# cached by docker after that.
 #
-# Usage: djava <path/to/app.jar> [java args...]
+# Usage: djava [java args...]
+#   djava -version
+#   djava -jar app.jar foo bar
+#   djava -cp . Main
 # Override the image (e.g. for a different Java version) with:
-#   DJAVA_IMAGE=eclipse-temurin:17-jre-alpine djava app.jar
+#   DJAVA_IMAGE=eclipse-temurin:17-jre-alpine djava -version
 djava() {
-  if [ $# -eq 0 ]; then
-    echo "Usage: djava <path/to/app.jar> [java args...]" >&2
-    return 1
-  fi
   local image="${DJAVA_IMAGE:-eclipse-temurin:25-jre-alpine}"
   local tty_flag=(-i)
   [ -t 1 ] && tty_flag=(-it)
@@ -21,5 +19,5 @@ djava() {
     -v "$PWD:/work" \
     -w /work \
     "$image" \
-    java -jar "$@"
+    java "$@"
 }
