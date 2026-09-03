@@ -31,6 +31,8 @@ dotfiles/
 │   └── setup.sh                  # installs SDKMAN + maven + mvnd + gradle (run by install.sh)
 ├── maven/
 │   └── settings.xml.example      # template -> ~/.m2/settings.xml (repo credentials via ${env.VAR})
+├── gradle/
+│   └── gradle.properties.example # template -> ~/.gradle/gradle.properties (daemon JVM args)
 ├── nvm/
 │   └── setup.sh                  # installs nvm, a Node.js version manager (run by install.sh)
 ├── bun/
@@ -313,7 +315,9 @@ automatically (there's no obvious default version to pick), so running
 For GitHub Packages / private repo credentials, see the GPR_USER/GPR_TOKEN
 block in `zsh/zshrc.secrets.example` (used by Gradle's `GRADLE_OPTS`) and
 `maven/settings.xml.example` (used by Maven via `${env.VAR}` — copy it to
-`~/.m2/settings.xml`).
+`~/.m2/settings.xml`). For Gradle daemon JVM args (heap size, Metaspace,
+`UseCompactObjectHeaders`, ...), see `gradle/gradle.properties.example` —
+copy it to `~/.gradle/gradle.properties`.
 
 The upstream installer normally appends its init snippet directly onto the
 end of `~/.zshrc`. Since `~/.zshrc` here is a symlink into this tracked

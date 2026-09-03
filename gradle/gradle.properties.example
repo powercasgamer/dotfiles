@@ -1,0 +1,17 @@
+# Example ~/.gradle/gradle.properties -- copy to ~/.gradle/gradle.properties
+# (mkdir -p ~/.gradle first if it doesn't exist yet). Applies to every
+# Gradle project on this machine as a default, unless a project's own
+# gradle.properties overrides it.
+#
+# No credentials belong here -- see the GPR_USER/GPR_TOKEN block in
+# zsh/zshrc.secrets.example (used via GRADLE_OPTS) for those instead.
+
+# --- Gradle daemon JVM args ---
+# Tune -Xmx to your machine's RAM and workload. UseCompactObjectHeaders
+# (Project Lilliput) needs JDK 24+ -- drop it on an older JDK.
+org.gradle.jvmargs=-Xmx2g -XX:MaxMetaspaceSize=512m -XX:+UseCompactObjectHeaders
+
+# --- other commonly recommended settings (uncomment as wanted) ---
+# org.gradle.parallel=true             # build independent subprojects concurrently
+# org.gradle.caching=true              # reuse task outputs from the build cache
+# org.gradle.configuration-cache=true  # cache the configuration phase itself
