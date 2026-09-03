@@ -1,5 +1,5 @@
 # Switch to a branch and bring it up to date.
-gsync() {
+gsfp() {
   if [ -z "$1" ]; then
     echo "Error: branch is required." >&2
     return 1
@@ -11,7 +11,7 @@ gsync() {
 
 # Format (gradle spotless), commit, push to main, and publish -- one shot
 # for a gradle project release commit.
-grelease() {
+gcpp() {
   if [ -z "$1" ]; then
     echo "Error: commit message is required." >&2
     return 1
@@ -34,7 +34,7 @@ gca() {
 }
 
 # Same as gca, but tags the commit [ci skip].
-gcaskip() {
+gsca() {
   if git diff --cached --quiet && git diff --quiet; then
     echo "No changes detected (staged or unstaged) - nothing to commit." >&2
     return 1
