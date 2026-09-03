@@ -33,6 +33,8 @@ dotfiles/
 │   └── settings.xml.example      # template -> ~/.m2/settings.xml (repo credentials via ${env.VAR})
 ├── gradle/
 │   └── gradle.properties.example # template -> ~/.gradle/gradle.properties (daemon JVM args)
+├── java/
+│   └── Dockerfile                # jlink-trimmed JRE image, built automatically by djava
 ├── nvm/
 │   └── setup.sh                  # installs nvm, a Node.js version manager (run by install.sh)
 ├── bun/
@@ -455,14 +457,21 @@ muscle memory (`d`, `dc`, `dps`, `dcup`/`dcdown`, etc.), though it won't
 help non-interactive scripts that call the literal `docker-compose` binary.
 
 `zsh/functions/docker/functions.zsh` adds `djava [java args...]` — runs
-`java` itself in a throwaway `eclipse-temurin:25-jre-alpine` container
-(Java 25), no local JDK/JRE needed: `djava -version`, `djava -jar app.jar
-foo bar`, `djava -cp . Main`, etc., same as calling `java` directly.
-Mounts `$PWD` as `/work` so relative paths (a jar, a classpath, ...)
-resolve the same as running them locally, and runs as your host uid/gid
-so any files it writes aren't root-owned. Override the image (e.g. a
-different Java version) with
-`DJAVA_IMAGE=eclipse-temurin:17-jre-alpine djava -version`.
+`java` itself in a throwaway container, no local JDK/JRE needed:
+`djava -version`, `djava -jar app.jar foo bar`, `djava -cp . Main`, etc.,
+same as calling `java` directly. Mounts `$PWD` as `/work` so relative
+paths (a jar, a classpath, ...) resolve the same as running them locally,
+and runs as your host uid/gid so any files it writes aren't root-owned.
+
+Defaults to `dotfiles-java-slim:25`, built from `java/Dockerfile` the
+first time `djava` is called (skipped on every call after that — it
+checks with `docker image inspect` first) — a jlink-trimmed JRE (~95MB
+vs ~287MB for stock `eclipse-temurin:25-jre-alpine`; see the Dockerfile
+for the exact module list and why). If a jar needs a module that's not
+in there (`jdeps <jar>` will tell you), either add it to the Dockerfile
+and let `djava` rebuild (delete the image first: `docker rmi
+dotfiles-java-slim:25`), or bypass it entirely with, e.g.,
+`DJAVA_IMAGE=eclipse-temurin:25-jre-alpine djava -jar app.jar`.
 
 ## Cleanup (`cleanup/`)
 
