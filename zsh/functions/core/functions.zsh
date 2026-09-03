@@ -37,3 +37,16 @@ dl() {
   local url="$1"
   wget --content-disposition "${url%%\?*}"
 }
+
+# upload a file to pastes.dev and print the resulting URL
+# e.g. paste ./script.sh sh
+paste() {
+  local file="$1"
+  local lang="$2"
+
+  if [[ -n "$lang" ]]; then
+    curl -T "$file" -H "Content-Type: text/$lang" https://api.pastes.dev/post
+  else
+    curl -T "$file" https://api.pastes.dev/post
+  fi
+}
