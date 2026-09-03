@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 # Installs SDKMAN (https://sdkman.io) -- a candidate version manager for the
-# JVM ecosystem (Java, Kotlin, Groovy, Gradle, Maven, sbt, Scala, ...).
+# JVM ecosystem (Java, Kotlin, Groovy, Gradle, Maven, sbt, Scala, ...) --
+# then installs the Maven and Maven Daemon (mvnd) candidates through it.
+# Unlike nvm/bun/pnpm/uv, SDKMAN itself doesn't ship a build tool, so those
+# two are installed explicitly rather than left as a manual `sdk install`.
 #
 # Unprivileged (installs into ~/.sdkman), so unlike docker/setup.sh,
 # cleanup/setup.sh and python/setup.sh this runs automatically from
@@ -13,7 +16,8 @@
 # exports/*.zsh file -- see the zshrc glob), and this script strips whatever
 # the installer appended to zshrc so the tracked file stays clean.
 #
-# Safe to re-run: skips the download if SDKMAN is already installed.
+# Safe to re-run: skips the download if SDKMAN, maven, or mvnd are already
+# installed.
 set -euo pipefail
 
 echo "==> SDKMAN"
@@ -43,5 +47,34 @@ if [ -f "$ZSHRC" ] && grep -q 'sdkman-init.sh' "$ZSHRC"; then
     sed -i '$ d' "$ZSHRC"
   done
 fi
+
+echo "==> Maven + Maven Daemon (mvnd)"
+# sdkman-init.sh and sdk's shell functions aren't written for `set -u`/`-e`
+# (e.g. they reference $ZSH_VERSION unguarded) -- relax both around them and
+# check exit statuses ourselves instead of letting a benign nonzero return
+# or unset variable abort this whole script.
+set +u
+# shellcheck disable=SC1091
+source "$HOME/.sdkman/bin/sdkman-init.sh"
+set -u
+
+install_candidate() {
+  local candidate="$1"
+  if [ -d "$HOME/.sdkman/candidates/$candidate/current" ]; then
+    echo "    $candidate already installed, skipping"
+    return
+  fi
+  set +eu
+  sdk install "$candidate" < /dev/null
+  local status=$?
+  set -eu
+  if [ "$status" -ne 0 ]; then
+    echo "    sdk install $candidate failed (exit $status)" >&2
+    exit "$status"
+  fi
+}
+
+install_candidate maven
+install_candidate mvnd
 
 echo "==> Done"

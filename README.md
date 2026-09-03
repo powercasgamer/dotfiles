@@ -28,7 +28,7 @@ dotfiles/
 │   ├── harden-server.sh        # server-side hardening (opt-in, NOT run by install.sh -- see below)
 │   └── sshd_hardening.conf      # drop-in installed to /etc/ssh/sshd_config.d/ by harden-server.sh
 ├── sdkman/
-│   └── setup.sh                  # installs SDKMAN, a JVM candidate version manager (run by install.sh)
+│   └── setup.sh                  # installs SDKMAN + maven + mvnd (run by install.sh)
 ├── nvm/
 │   └── setup.sh                  # installs nvm, a Node.js version manager (run by install.sh)
 ├── bun/
@@ -299,6 +299,14 @@ Unprivileged, like `git/setup.sh` and `ssh/setup.sh` — installs into
 Gradle, Maven, sbt, Scala, and other JVM-ecosystem tools —
 `sdk install java`, `sdk use java 21-tem`, etc. Safe to re-run: skips the
 download if `~/.sdkman/bin/sdkman-init.sh` already exists.
+
+Once SDKMAN itself is installed, this script also runs
+`sdk install maven` and `sdk install mvnd` (the latest default version of
+each) so both are ready to use immediately — skipped individually if
+`~/.sdkman/candidates/<maven|mvnd>/current` already exists. No JDK is
+installed automatically (there's no obvious default version to pick), so
+running `mvn`/`mvnd` will fail with a `JAVA_HOME` error until you run
+`sdk install java` yourself.
 
 The upstream installer normally appends its init snippet directly onto the
 end of `~/.zshrc`. Since `~/.zshrc` here is a symlink into this tracked
