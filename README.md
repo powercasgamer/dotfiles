@@ -76,7 +76,7 @@ dotfiles/
     │   ├── sdkman/sdkman.zsh       # SDKMAN_DIR + sources sdkman-init.sh, if installed
     │   └── node/nvm.zsh            # NVM_DIR + sources nvm.sh, if installed
     └── functions/
-        ├── core/functions.zsh      # mkcd, bak, psgrep, bsha256/bsha512, rsync-copy
+        ├── core/functions.zsh      # mkcd, bak, psgrep, bsha256/bsha512, rsync-copy, dl
         ├── gradle/functions.zsh    # diegradledie, killgradle (force/graceful daemon kill)
         └── git/functions.zsh      # gsfp, gcpp, gca, gsca, gpush
 ```

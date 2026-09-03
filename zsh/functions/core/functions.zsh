@@ -30,3 +30,10 @@ bsha512() {
 rsync-copy() {
   rsync -avzPh "$@"
 }
+
+# download a URL, keeping the server's suggested filename and stripping any
+# query string from it
+dl() {
+  local url="$1"
+  wget --content-disposition "${url%%\?*}"
+}
