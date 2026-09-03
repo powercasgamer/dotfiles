@@ -146,7 +146,9 @@ if [[ "$IS_ROOT" -eq 1 ]]; then
       line="$(echo "$line" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
       [[ -z "$line" || "$line" == \#* ]] && continue
       name="${line%% *}"
-      log_dir="$(echo "${line#"$name"}" | sed -e 's/^[[:space:]]*//')"
+      rest="${line#"$name"}"
+      [[ "$rest" =~ ^[[:space:]]*(.*)$ ]]
+      log_dir="${BASH_REMATCH[1]}"
       [[ ! -d "$log_dir" ]] && continue
 
       sweep_rotated_logs "$log_dir" "$name ($log_dir)"
