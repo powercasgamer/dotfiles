@@ -3,7 +3,8 @@ alias gs="git status"
 alias ga="git add"
 alias gaa="git add -A"
 alias gc="git commit -m"
-alias gca="git commit -am"
+# gca is a function (functions/git/functions.zsh): add -A + commit, but
+# only if there's something to commit -- not a plain "commit -am" alias.
 alias gp="git push"
 alias gpl="git pull"
 alias gco="git checkout"

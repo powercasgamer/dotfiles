@@ -77,7 +77,8 @@ dotfiles/
     │   └── node/nvm.zsh            # NVM_DIR + sources nvm.sh, if installed
     └── functions/
         ├── core/functions.zsh      # mkcd, bak, psgrep, bsha256/bsha512, rsync-copy
-        └── gradle/functions.zsh    # diegradledie, killgradle (force/graceful daemon kill)
+        ├── gradle/functions.zsh    # diegradledie, killgradle (force/graceful daemon kill)
+        └── git/functions.zsh      # gsfp, gcpp, gca, gsca, gpush
 ```
 
 `zshrc` sources every `*.zsh` file found anywhere under `aliases/`,
