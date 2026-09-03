@@ -12,6 +12,10 @@ killgradlehard() {
 # Graceful daemon stop, falling back to a hard kill of anything still
 # around after gradle's own shutdown window.
 killgradle() {
+  if ! command -v gradle >/dev/null 2>&1; then
+    echo "Error: gradle not found on PATH." >&2
+    return 1
+  fi
   gradle --stop
   sleep 15
   if pkill -9 -f GradleDaemon; then
