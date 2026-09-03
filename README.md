@@ -10,7 +10,8 @@ script to reproduce the whole setup.
 dotfiles/
 ├── .github/
 │   └── workflows/
-│       └── lint.yml           # shellcheck on every *.sh, on push/PR
+│       ├── lint.yml           # shellcheck on every *.sh, on push/PR
+│       └── docker-build.yml   # builds + smoke-tests java/Dockerfile on change
 ├── install.sh        # installs Oh My Zsh + plugins, symlinks ~/.zshrc, runs git/setup.sh + tmux/setup.sh
 ├── new-user.sh        # creates a Linux user and bootstraps this whole setup for them
 ├── git/
@@ -165,6 +166,10 @@ run, then leaves them alone on every re-run:
 - **`lint.yml`** -- runs `shellcheck` over every `*.sh` on push/PR. The
   `*.zsh` files are excluded: they're sourced snippets (no shebang), not
   scripts, and use zsh syntax shellcheck doesn't parse.
+- **`docker-build.yml`** -- builds `java/Dockerfile` and runs
+  `java -version` / `--list-modules` against it whenever that file changes.
+  Exists because a `jlink --add-modules` typo in that file once only
+  surfaced at build/run time -- this catches it in CI instead.
 
 ## Suggestions plugin
 

@@ -1,0 +1,23 @@
+name: Docker build
+
+# Builds + smoke-tests java/Dockerfile on every change to it. This is the
+# same class of bug that shipped once already (a jlink --add-modules typo
+# that only surfaced at build/run time) -- this catches it in CI instead.
+on:
+  push:
+    branches: [main]
+    paths: ["java/Dockerfile"]
+  pull_request:
+    paths: ["java/Dockerfile"]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build image
+        run: docker build -t dotfiles-java-slim:ci ./java
+      - name: Smoke test
+        run: |
+          docker run --rm dotfiles-java-slim:ci java -version
+          docker run --rm dotfiles-java-slim:ci java --list-modules
