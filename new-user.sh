@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Creates a Linux user (if it doesn't exist yet) and applies the full
 # dotfiles setup to their account: zsh + Oh My Zsh + plugins, aliases,
-# git identity/defaults, git-lfs, SSH commit/tag signing, SDKMAN, nvm, uv.
+# git identity/defaults, git-lfs, SSH commit/tag signing, SDKMAN, nvm, bun,
+# pnpm, uv.
 #
 # Must run as root (it calls useradd). Safe to re-run for an existing user
 # -- it will not touch a dotfiles copy that's already there, just re-run
@@ -18,6 +19,9 @@
 #                         this host. NOT the default -- docker group
 #                         membership is root-equivalent (see docker/setup.sh),
 #                         so it's opt-in per account rather than automatic.
+#   --sudo                add the user to the sudo group, so they can use
+#                         sudo instead of needing root. NOT the default --
+#                         same root-equivalent reasoning as --docker.
 #
 # Without --git-name/--git-email, install.sh drops into an interactive
 # prompt for git identity (see git/setup.sh) -- fine when you're running
@@ -29,19 +33,21 @@ if [ "$(id -u)" -ne 0 ]; then
   exit 1
 fi
 
-USERNAME="${1:?Usage: sudo $0 <username> [--no-password] [--git-name NAME] [--git-email EMAIL]}"
+USERNAME="${1:?Usage: sudo $0 <username> [--no-password] [--git-name NAME] [--git-email EMAIL] [--docker] [--sudo]}"
 shift
 
 SET_PASSWORD=1
 NEW_GIT_NAME=""
 NEW_GIT_EMAIL=""
 ADD_DOCKER=0
+ADD_SUDO=0
 while [ $# -gt 0 ]; do
   case "$1" in
     --no-password) SET_PASSWORD=0; shift ;;
     --git-name) NEW_GIT_NAME="${2:?--git-name needs a value}"; shift 2 ;;
     --git-email) NEW_GIT_EMAIL="${2:?--git-email needs a value}"; shift 2 ;;
     --docker) ADD_DOCKER=1; shift ;;
+    --sudo) ADD_SUDO=1; shift ;;
     *) echo "Unknown option: $1" >&2; exit 1 ;;
   esac
 done
@@ -87,6 +93,17 @@ fi
 
 echo "==> Running install.sh as $USERNAME"
 runuser -l "$USERNAME" -c "GIT_NAME=$(printf '%q' "$NEW_GIT_NAME") GIT_EMAIL=$(printf '%q' "$NEW_GIT_EMAIL") $(printf '%q' "$USER_HOME/dotfiles/install.sh")"
+
+if [ "$ADD_SUDO" -eq 1 ]; then
+  echo "==> sudo group"
+  if getent group sudo >/dev/null 2>&1; then
+    usermod -aG sudo "$USERNAME"
+    echo "    added $USERNAME to the sudo group"
+  else
+    echo "    sudo group doesn't exist on this host -- add manually:"
+    echo "    usermod -aG sudo $USERNAME"
+  fi
+fi
 
 if [ "$ADD_DOCKER" -eq 1 ]; then
   echo "==> Docker group"
