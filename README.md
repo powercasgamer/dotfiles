@@ -454,6 +454,13 @@ the old standalone `docker-compose` binary is deprecated upstream.
 muscle memory (`d`, `dc`, `dps`, `dcup`/`dcdown`, etc.), though it won't
 help non-interactive scripts that call the literal `docker-compose` binary.
 
+`zsh/functions/docker/functions.zsh` adds `djar <path/to/app.jar> [args...]`
+— runs a jar in a throwaway `eclipse-temurin:*-jre-alpine` container, no
+local JDK/JRE needed. Mounts `$PWD` (not just the jar's directory) so
+relative paths in the jar's own args still resolve, and runs as your host
+uid/gid so any files it writes aren't root-owned. Override the Java version
+with `DJAR_IMAGE=eclipse-temurin:17-jre-alpine djar app.jar`.
+
 ## Cleanup (`cleanup/`)
 
 Reclaims disk space on a schedule: old Docker containers/images/build
