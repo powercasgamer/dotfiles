@@ -65,7 +65,7 @@ dotfiles/
     │   ├── ls/aliases.zsh          # ls/ll/lt, grep colors
     │   ├── nav/aliases.zsh         # .., ..., -
     │   ├── safety/aliases.zsh      # rm/cp/mv -i
-    │   ├── system/aliases.zsh      # apt update/install, ports, myip
+    │   ├── system/aliases.zsh      # apt update/install, ports, myip, nukejetbrains
     │   ├── tmux/aliases.zsh        # tm/tma/tml/tmk/tmn, claude-tmux
     │   ├── docker/aliases.zsh      # d, dc, dps, dcup/dcdown, docker-compose compat
     │   ├── gradle/aliases.zsh      # deletegradle, gbuild, cleangradle, fastgradle
@@ -78,7 +78,8 @@ dotfiles/
     └── functions/
         ├── core/functions.zsh      # mkcd, bak, psgrep, bsha256/bsha512, rsync-copy, dl, paste
         ├── gradle/functions.zsh    # diegradledie, killgradle (force/graceful daemon kill)
-        └── git/functions.zsh      # gsfp, gcpp, gca, gsca, gpush
+        ├── git/functions.zsh      # gsfp, gcpp, gca, gsca, gpush
+        └── system/functions.zsh   # killgateway
 ```
 
 `zshrc` sources every `*.zsh` file found anywhere under `aliases/`,
