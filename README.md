@@ -29,6 +29,8 @@ dotfiles/
 │   └── sshd_hardening.conf      # drop-in installed to /etc/ssh/sshd_config.d/ by harden-server.sh
 ├── sdkman/
 │   └── setup.sh                  # installs SDKMAN + maven + mvnd + gradle (run by install.sh)
+├── maven/
+│   └── settings.xml.example      # template -> ~/.m2/settings.xml (repo credentials via ${env.VAR})
 ├── nvm/
 │   └── setup.sh                  # installs nvm, a Node.js version manager (run by install.sh)
 ├── bun/
@@ -307,6 +309,11 @@ three are ready to use immediately — skipped individually if
 automatically (there's no obvious default version to pick), so running
 `mvn`/`mvnd`/`gradle` will fail with a `JAVA_HOME` error until you run
 `sdk install java` yourself.
+
+For GitHub Packages / private repo credentials, see the GPR_USER/GPR_TOKEN
+block in `zsh/zshrc.secrets.example` (used by Gradle's `GRADLE_OPTS`) and
+`maven/settings.xml.example` (used by Maven via `${env.VAR}` — copy it to
+`~/.m2/settings.xml`).
 
 The upstream installer normally appends its init snippet directly onto the
 end of `~/.zshrc`. Since `~/.zshrc` here is a symlink into this tracked

@@ -1,0 +1,25 @@
+<!--
+  Example ~/.m2/settings.xml: copy to ~/.m2/settings.xml (mkdir -p ~/.m2
+  first if it doesn't exist yet), then adjust the <id> below to match
+  whatever repository id your project's pom.xml <repository> /
+  <distributionManagement> block expects (GitHub Packages repos are
+  usually just "github").
+
+  Credentials are NOT hardcoded here: ${env.VAR} pulls them from
+  GPR_USER/GPR_TOKEN, set once in ~/.zshrc.secrets (see
+  zsh/zshrc.secrets.example) and shared with Gradle's GRADLE_OPTS. That
+  means this file has nothing sensitive in it, so unlike ~/.zshrc.secrets
+  it does NOT need chmod 600.
+-->
+<settings xmlns="http://maven.apache.org/SETTINGS/1.2.0"
+          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+          xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.2.0
+                              https://maven.apache.org/xsd/settings-1.2.0.xsd">
+  <servers>
+    <server>
+      <id>github</id>
+      <username>${env.GPR_USER}</username>
+      <password>${env.GPR_TOKEN}</password>
+    </server>
+  </servers>
+</settings>
