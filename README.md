@@ -68,7 +68,7 @@ dotfiles/
     │   ├── system/aliases.zsh      # apt update/install, ports, myip, nukejetbrains
     │   ├── tmux/aliases.zsh        # tm/tma/tml/tmk/tmn, claude-tmux
     │   ├── docker/aliases.zsh      # d, dc, dps, dcup/dcdown, docker-compose compat
-    │   ├── gradle/aliases.zsh      # deletegradle, gbuild, cleangradle, fastgradle
+    │   ├── gradle/aliases.zsh      # gbuild, cleangradle
     │   └── misc/aliases.zsh        # reload, zshconfig, dotfiles
     ├── exports/
     │   ├── core/exports.zsh        # locale, EDITOR, history size, PATH, less colors
