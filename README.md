@@ -77,8 +77,8 @@ dotfiles/
     │   └── node/nvm.zsh            # NVM_DIR + sources nvm.sh, if installed
     └── functions/
         ├── core/functions.zsh      # mkcd, bak, psgrep, bsha256/bsha512, rsync-copy, dl, paste
-        ├── gradle/functions.zsh    # diegradledie, killgradle (force/graceful daemon kill)
-        ├── git/functions.zsh      # gsfp, gcpp, gca, gsca, gpush
+        ├── gradle/functions.zsh    # killgradlehard, killgradle (force/graceful daemon kill)
+        ├── git/functions.zsh      # gsync, grelease, gca, gcaskip, gpush
         └── system/functions.zsh   # killgateway
 ```
 
