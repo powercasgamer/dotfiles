@@ -5,15 +5,15 @@
 # jars/paths that live under $PWD. The image is pulled once and cached by
 # docker after that.
 #
-# Usage: djar <path/to/app.jar> [java args...]
+# Usage: djava <path/to/app.jar> [java args...]
 # Override the image (e.g. for a different Java version) with:
-#   DJAR_IMAGE=eclipse-temurin:17-jre-alpine djar app.jar
-djar() {
+#   DJAVA_IMAGE=eclipse-temurin:17-jre-alpine djava app.jar
+djava() {
   if [ $# -eq 0 ]; then
-    echo "Usage: djar <path/to/app.jar> [java args...]" >&2
+    echo "Usage: djava <path/to/app.jar> [java args...]" >&2
     return 1
   fi
-  local image="${DJAR_IMAGE:-eclipse-temurin:21-jre-alpine}"
+  local image="${DJAVA_IMAGE:-eclipse-temurin:25-jre-alpine}"
   local tty_flag=(-i)
   [ -t 1 ] && tty_flag=(-it)
   docker run --rm "${tty_flag[@]}" \
