@@ -68,6 +68,7 @@ dotfiles/
     │   ├── system/aliases.zsh      # apt update/install, ports, myip
     │   ├── tmux/aliases.zsh        # tm/tma/tml/tmk/tmn, claude-tmux
     │   ├── docker/aliases.zsh      # d, dc, dps, dcup/dcdown, docker-compose compat
+    │   ├── gradle/aliases.zsh      # deletegradle, gbuild, cleangradle, fastgradle
     │   └── misc/aliases.zsh        # reload, zshconfig, dotfiles
     ├── exports/
     │   ├── core/exports.zsh        # locale, EDITOR, history size, PATH, less colors
@@ -75,7 +76,8 @@ dotfiles/
     │   ├── sdkman/sdkman.zsh       # SDKMAN_DIR + sources sdkman-init.sh, if installed
     │   └── node/nvm.zsh            # NVM_DIR + sources nvm.sh, if installed
     └── functions/
-        └── core/functions.zsh      # mkcd, bak, psgrep, bsha256/bsha512, rsync-copy
+        ├── core/functions.zsh      # mkcd, bak, psgrep, bsha256/bsha512, rsync-copy
+        └── gradle/functions.zsh    # diegradledie, killgradle (force/graceful daemon kill)
 ```
 
 `zshrc` sources every `*.zsh` file found anywhere under `aliases/`,
