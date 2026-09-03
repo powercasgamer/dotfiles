@@ -147,8 +147,8 @@ run, then leaves them alone on every re-run:
 
 - `~/.zshrc.local` -- host-only tweaks: PATH additions, aliases, prompt
   overrides. Nothing sensitive.
-- `~/.zshrc.secrets` -- actual credentials (Gradle/Sentry/npm tokens, API
-  keys, ...). Created `chmod 600`. Kept separate from `.local` so it's
+- `~/.zshrc.secrets` -- actual credentials (Gradle/Maven/Sentry/npm tokens,
+  API keys, ...). Created `chmod 600`. Kept separate from `.local` so it's
   obvious at a glance what's sensitive.
 
 ## Suggestions plugin
