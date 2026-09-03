@@ -8,6 +8,9 @@ script to reproduce the whole setup.
 
 ```
 dotfiles/
+├── .github/
+│   └── workflows/
+│       └── lint.yml           # shellcheck on every *.sh, on push/PR
 ├── install.sh        # installs Oh My Zsh + plugins, symlinks ~/.zshrc, runs git/setup.sh + tmux/setup.sh
 ├── new-user.sh        # creates a Linux user and bootstraps this whole setup for them
 ├── git/
@@ -156,6 +159,12 @@ run, then leaves them alone on every re-run:
 - `~/.zshrc.secrets` -- actual credentials (Gradle/Maven/Sentry/npm tokens,
   API keys, ...). Created `chmod 600`. Kept separate from `.local` so it's
   obvious at a glance what's sensitive.
+
+## CI (`.github/workflows/`)
+
+- **`lint.yml`** -- runs `shellcheck` over every `*.sh` on push/PR. The
+  `*.zsh` files are excluded: they're sourced snippets (no shebang), not
+  scripts, and use zsh syntax shellcheck doesn't parse.
 
 ## Suggestions plugin
 
