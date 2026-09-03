@@ -85,6 +85,12 @@ fi
 echo "==> nvm"
 "$DOTFILES_DIR/nvm/setup.sh"
 
+echo "==> bun"
+"$DOTFILES_DIR/bun/setup.sh"
+
+echo "==> pnpm"
+"$DOTFILES_DIR/pnpm/setup.sh"
+
 echo "==> Docker"
 if command -v docker >/dev/null 2>&1; then
   echo "    already installed"

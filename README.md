@@ -31,6 +31,10 @@ dotfiles/
 │   └── setup.sh                  # installs SDKMAN, a JVM candidate version manager (run by install.sh)
 ├── nvm/
 │   └── setup.sh                  # installs nvm, a Node.js version manager (run by install.sh)
+├── bun/
+│   └── setup.sh                  # installs bun, a JS/TS runtime + package manager (run by install.sh)
+├── pnpm/
+│   └── setup.sh                  # installs pnpm, a Node.js package manager (run by install.sh)
 ├── uv/
 │   └── setup.sh                  # installs uv, a Python package/venv/tool manager (run by install.sh)
 ├── docker/
@@ -315,6 +319,42 @@ runs it with `PROFILE=/dev/null`, which tells the installer to skip
 touching any profile file at all — the actual sourcing lives in
 `zsh/exports/node/nvm.zsh` instead, loaded the same way as every other
 `exports/*.zsh` file.
+
+## bun setup (`bun/setup.sh`)
+
+Unprivileged, like `sdkman/setup.sh` and `nvm/setup.sh` — installs into
+`~/.bun`, no root needed, so it's run automatically by `install.sh`.
+
+[bun](https://bun.sh) is a fast all-in-one JS/TS runtime, bundler, test
+runner, and package manager — `bun install`, `bun run`, `bun test`, etc.
+Safe to re-run: skips the download if `~/.bun/bin/bun` already exists.
+
+The upstream installer has no flag to skip modifying shell rc files — it
+unconditionally appends a `BUN_INSTALL`/`PATH` snippet to the end of
+`~/.zshrc` if it's writable. Since `~/.zshrc` here is a symlink into this
+tracked repo, `bun/setup.sh` snapshots its line count before running the
+installer and truncates it back afterward — the actual sourcing lives in
+`zsh/exports/bun/bun.zsh` instead, loaded the same way as every other
+`exports/*.zsh` file.
+
+## pnpm setup (`pnpm/setup.sh`)
+
+Unprivileged, like `sdkman/setup.sh` and `nvm/setup.sh` — installs into
+`~/.local/share/pnpm`, no root needed, so it's run automatically by
+`install.sh`.
+
+[pnpm](https://pnpm.io) is a fast, disk-space-efficient package manager
+for Node.js (uses a content-addressable store instead of duplicating
+`node_modules` per project) — `pnpm install`, `pnpm add`, `pnpm dlx`, etc.
+Safe to re-run: skips the download if `~/.local/share/pnpm/pnpm` already
+exists.
+
+The upstream installer runs `pnpm setup --force`, which unconditionally
+appends a `PNPM_HOME`/`PATH` snippet to the end of `~/.zshrc`. Since
+`~/.zshrc` here is a symlink into this tracked repo, `pnpm/setup.sh`
+snapshots its line count before running the installer and truncates it
+back afterward — the actual sourcing lives in `zsh/exports/node/pnpm.zsh`
+instead, loaded the same way as every other `exports/*.zsh` file.
 
 ## uv setup (`uv/setup.sh`)
 
