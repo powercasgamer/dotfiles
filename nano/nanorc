@@ -1,0 +1,14 @@
+# ~/dotfiles/nano/nanorc
+# Symlinked to ~/.nanorc by dotfiles/nano/setup.sh -- keep machine-specific
+# stuff out of this file.
+
+# Most distros already enable this in /etc/nanorc, but not all (minimal
+# container images, older installs) -- included explicitly so syntax
+# highlighting works the same on every machine this repo is used on.
+include "/usr/share/nano/*.nanorc"
+
+set tabsize 2
+set tabstospaces
+set autoindent
+set linenumbers
+set constantshow

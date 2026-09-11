@@ -69,6 +69,14 @@ else
   echo "    just run: sudo apt install -y tmux && ~/dotfiles/tmux/setup.sh"
 fi
 
+echo "==> nano config"
+if command -v nano >/dev/null 2>&1; then
+  "$DOTFILES_DIR/nano/setup.sh"
+else
+  echo "    nano not installed, skipping. Install it and re-run this script, or"
+  echo "    just run: sudo apt install -y nano && ~/dotfiles/nano/setup.sh"
+fi
+
 echo "==> SSH client config"
 "$DOTFILES_DIR/ssh/setup.sh"
 echo "    (server-side hardening is separate and NOT run automatically --"
