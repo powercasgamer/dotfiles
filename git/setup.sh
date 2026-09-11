@@ -25,13 +25,24 @@ echo "==> Git identity & defaults"
 GIT_NAME="${GIT_NAME:-$(git config --global user.name || true)}"
 GIT_EMAIL="${GIT_EMAIL:-$(git config --global user.email || true)}"
 
+prompt_value() {
+  local label="$1"
+  if command -v gum >/dev/null 2>&1; then
+    gum input --header "$label"
+  else
+    local value
+    read -rp "$label: " value
+    printf '%s' "$value"
+  fi
+}
+
 if [ -z "$GIT_NAME" ] || [ -z "$GIT_EMAIL" ]; then
   if [ -t 0 ]; then
     while [ -z "$GIT_NAME" ]; do
-      read -rp "Git user.name (e.g. a display name, not necessarily your legal name): " GIT_NAME
+      GIT_NAME="$(prompt_value "Git user.name (e.g. a display name, not necessarily your legal name)")"
     done
     while [ -z "$GIT_EMAIL" ]; do
-      read -rp "Git user.email: " GIT_EMAIL
+      GIT_EMAIL="$(prompt_value "Git user.email")"
     done
   else
     echo "    no git identity configured and not running interactively -- skipping"
