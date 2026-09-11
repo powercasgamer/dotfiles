@@ -159,7 +159,8 @@ if [[ "$IS_ROOT" -eq 1 ]]; then
   # sql, and anything else listed) -- skipped per-line if not present.
   if [[ -f "$SERVICE_LOGS_FILE" ]]; then
     while IFS= read -r line; do
-      line="$(echo "$line" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
+      line="${line#"${line%%[![:space:]]*}"}"
+      line="${line%"${line##*[![:space:]]}"}"
       [[ -z "$line" || "$line" == \#* ]] && continue
       name="${line%% *}"
       rest="${line#"$name"}"
