@@ -14,6 +14,7 @@
 # obvious in `ufw status` where a rule came from.
 #
 # Usage:
+#   ~/dotfiles/firewall/setup-firewall.sh                     # interactive menu (needs gum: ~/dotfiles/gum/setup.sh)
 #   sudo ~/dotfiles/firewall/setup-firewall.sh add cloudflare [--port 80,443] [--proto tcp]
 #   sudo ~/dotfiles/firewall/setup-firewall.sh remove cloudflare [--port 80,443] [--proto tcp]
 #   ~/dotfiles/firewall/setup-firewall.sh list-providers
@@ -140,7 +141,66 @@ do_interface_rule() {
   echo "    Review with: sudo ufw status numbered | grep '$comment'"
 }
 
-[ "$#" -ge 1 ] || usage
+run_interactive() {
+  if ! command -v gum >/dev/null 2>&1; then
+    echo "No arguments given, and 'gum' isn't installed for the interactive menu." >&2
+    echo "Install it with: ~/dotfiles/gum/setup.sh   (or pass args directly)" >&2
+    echo >&2
+    usage
+  fi
+
+  local action
+  action="$(gum choose --header "What do you want to do?" \
+    add remove trust-ip untrust-ip trust-interface untrust-interface list-providers)" || true
+  [ -n "$action" ] || { echo "Cancelled." >&2; exit 1; }
+
+  case "$action" in
+    list-providers)
+      list_providers
+      ;;
+
+    add | remove)
+      local provider ports proto
+      provider="$(list_providers | gum choose --header "Provider?")" || true
+      [ -n "$provider" ] || { echo "Cancelled." >&2; exit 1; }
+      ports="$(gum input --header "Ports" --value "80,443")" || true
+      proto="$(gum input --header "Protocol" --value "tcp")" || true
+      gum confirm "About to $action $provider's IP ranges (port $ports/$proto). Continue?" \
+        || { echo "Cancelled." >&2; exit 1; }
+      require_root "$action" "$provider"
+      require_ufw
+      do_provider_rule "$action" "$provider" "$ports" "$proto"
+      ;;
+
+    trust-ip | untrust-ip)
+      local ip
+      ip="$(gum input --header "IP address")" || true
+      [ -n "$ip" ] || { echo "Cancelled." >&2; exit 1; }
+      gum confirm "About to $action $ip (all ports/protocols, both directions). Continue?" \
+        || { echo "Cancelled." >&2; exit 1; }
+      require_root "$action" "$ip"
+      require_ufw
+      do_ip_rule "$action" "$ip"
+      ;;
+
+    trust-interface | untrust-interface)
+      local iface
+      iface="$(gum input --header "Interface name" --value "tailscale0")" || true
+      [ -n "$iface" ] || { echo "Cancelled." >&2; exit 1; }
+      gum confirm "About to $action interface $iface (all ports/protocols, both directions). Continue?" \
+        || { echo "Cancelled." >&2; exit 1; }
+      require_root "$action" "$iface"
+      require_ufw
+      do_interface_rule "$action" "$iface"
+      ;;
+  esac
+}
+
+if [ "$#" -eq 0 ]; then
+  run_interactive
+  exit 0
+fi
+
 ACTION="$1"; shift
 
 case "$ACTION" in
