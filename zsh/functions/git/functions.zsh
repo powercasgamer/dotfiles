@@ -33,10 +33,6 @@ gcpp() {
 
 # Stage everything and commit, but only if there's actually something to
 # commit -- avoids an empty/failed commit from running this out of habit.
-# oh-my-zsh's git plugin defines an alias named gca, loaded before this file;
-# zsh can't define a function over an existing alias of the same name, so
-# clear it first.
-unalias gca 2>/dev/null
 gca() {
   if git diff --cached --quiet && git diff --quiet; then
     echo "No changes detected (staged or unstaged) - nothing to commit." >&2
