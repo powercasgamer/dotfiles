@@ -18,6 +18,12 @@
 # Usage:
 #   ./cleanup.sh [--dry-run]
 #
+# When run interactively (a TTY) without --dry-run, asks for confirmation
+# first (via gum if installed, else a plain y/N read) since this deletes
+# things for real. Skipped automatically for --dry-run and for
+# non-interactive runs (e.g. the systemd timer from setup.sh), so the
+# unattended schedule is never blocked waiting on input.
+#
 # Env vars (all ages accept docker-style durations like 168h/30d, or find's
 # day counts where noted):
 #   DOCKER_CONTAINER_AGE   default 168h  (7d)  -- stopped containers older than this
@@ -56,6 +62,16 @@ TARGET_USER="${TARGET_USER:-${SUDO_USER:-$(id -un)}}"
 
 IS_ROOT=0
 [[ "$(id -u)" -eq 0 ]] && IS_ROOT=1
+
+if [[ "$DRY_RUN" -eq 0 && -t 0 ]]; then
+  PROMPT="This will prune Docker resources, vacuum journald/apt, delete old rotated logs, and empty trash/thumbnails older than ${TRASH_AGE_DAYS}d for '$TARGET_USER'. Continue?"
+  if command -v gum >/dev/null 2>&1; then
+    gum confirm "$PROMPT" || { echo "Cancelled." >&2; exit 1; }
+  else
+    read -rp "$PROMPT [y/N] " REPLY
+    [[ "$REPLY" =~ ^[Yy]$ ]] || { echo "Cancelled." >&2; exit 1; }
+  fi
+fi
 
 run() {
   if [[ "$DRY_RUN" -eq 1 ]]; then
