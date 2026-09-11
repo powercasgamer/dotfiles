@@ -111,6 +111,10 @@ echo "==> Storage cleanup"
 echo "    not installed (needs root, so not run automatically here):"
 echo "    sudo ~/dotfiles/cleanup/setup.sh"
 
+echo "==> micro (optional editor)"
+echo "    not installed (needs root, so not run automatically here):"
+echo "    sudo ~/dotfiles/micro/setup.sh"
+
 echo "==> Python 3"
 if command -v python3 >/dev/null 2>&1; then
   echo "    already installed"
