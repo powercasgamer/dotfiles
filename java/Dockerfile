@@ -24,7 +24,7 @@ RUN jlink \
       --compress=zip-6 \
       --output /javaruntime
 
-FROM alpine:3.20
+FROM alpine:3.24
 
 COPY --from=builder /javaruntime /opt/java
 ENV JAVA_HOME=/opt/java
