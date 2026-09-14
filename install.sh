@@ -123,6 +123,14 @@ else
   echo "    sudo ~/dotfiles/flatpak/setup.sh"
 fi
 
+echo "==> apt speedup (optional, skips translation index files on apt update)"
+if [ -e /etc/apt/apt.conf.d/99dotfiles-no-translations ]; then
+  echo "    already configured"
+else
+  echo "    not configured (needs root, so not run automatically here):"
+  echo "    sudo ~/dotfiles/apt/setup.sh"
+fi
+
 echo "==> Python 3"
 if command -v python3 >/dev/null 2>&1; then
   echo "    already installed"

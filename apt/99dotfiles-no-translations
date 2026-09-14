@@ -1,0 +1,6 @@
+// Managed by dotfiles (apt/setup.sh). Skips downloading translation index
+// files (Translation-en, etc.) during `apt update` -- they're only used
+// for localized package descriptions, not for resolving or installing
+// anything, so skipping them makes `apt update` faster with no change in
+// install behavior. Safe to delete this file to revert.
+Acquire::Languages "none";
