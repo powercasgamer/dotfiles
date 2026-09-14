@@ -131,9 +131,10 @@ fi
 
 # ---- apt (root only) ---------------------------------------------------
 if [[ "$IS_ROOT" -eq 1 ]] && command -v apt-get >/dev/null 2>&1; then
-  echo "==> apt: autoremove + autoclean"
+  echo "==> apt: autoremove + autoclean + clean"
   run apt-get -y autoremove
   run apt-get -y autoclean
+  run apt-get -y clean
 else
   echo "==> apt: skipping (needs root, or not present)"
 fi
