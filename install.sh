@@ -115,6 +115,14 @@ echo "==> micro (optional editor)"
 echo "    not installed (needs root, so not run automatically here):"
 echo "    sudo ~/dotfiles/micro/setup.sh"
 
+echo "==> Flatpak (optional)"
+if command -v flatpak >/dev/null 2>&1; then
+  echo "    already installed"
+else
+  echo "    not installed (needs root, so not run automatically here):"
+  echo "    sudo ~/dotfiles/flatpak/setup.sh"
+fi
+
 echo "==> Python 3"
 if command -v python3 >/dev/null 2>&1; then
   echo "    already installed"
