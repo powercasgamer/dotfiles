@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
 # Reclaims disk space: old Docker containers/images/build cache/oversized
-# container logs, systemd journal, apt cache, stale rotated logs (/var/log
-# plus whatever's listed in service-logs.txt -- redis/mongo/nats/influxdb/
-# questdb/clickhouse/sql/etc, if actually present), and the invoking user's
-# trash + thumbnail cache. Meant to run unattended (see setup.sh's timer)
-# but is just as fine run by hand.
+# container logs, systemd journal, apt cache, unused flatpak
+# runtimes/extensions, stale rotated logs (/var/log plus whatever's listed
+# in service-logs.txt -- redis/mongo/nats/influxdb/questdb/clickhouse/sql/
+# etc, if actually present), and the invoking user's trash + thumbnail
+# cache. Meant to run unattended (see setup.sh's timer) but is just as fine
+# run by hand.
 #
 # Nothing here is hardcoded to a fixed set of services -- service-logs.txt
 # is a plain "name path" list, skipped per-line if the path doesn't exist,
@@ -64,7 +65,7 @@ IS_ROOT=0
 [[ "$(id -u)" -eq 0 ]] && IS_ROOT=1
 
 if [[ "$DRY_RUN" -eq 0 && -t 0 ]]; then
-  PROMPT="This will prune Docker resources, vacuum journald/apt, delete old rotated logs, and empty trash/thumbnails older than ${TRASH_AGE_DAYS}d for '$TARGET_USER'. Continue?"
+  PROMPT="This will prune Docker resources, vacuum journald/apt/flatpak, delete old rotated logs, and empty trash/thumbnails older than ${TRASH_AGE_DAYS}d for '$TARGET_USER'. Continue?"
   if command -v gum >/dev/null 2>&1; then
     gum confirm "$PROMPT" || { echo "Cancelled." >&2; exit 1; }
   else
@@ -137,6 +138,17 @@ if [[ "$IS_ROOT" -eq 1 ]] && command -v apt-get >/dev/null 2>&1; then
   run apt-get -y clean
 else
   echo "==> apt: skipping (needs root, or not present)"
+fi
+
+# ---- flatpak (root only) ------------------------------------------------
+if [[ "$IS_ROOT" -eq 1 ]] && command -v flatpak >/dev/null 2>&1; then
+  echo "==> flatpak: removing unused runtimes/extensions"
+  run flatpak uninstall --system --unused -y
+
+  echo "==> flatpak: repairing/deduplicating local repo"
+  run flatpak repair --system
+else
+  echo "==> flatpak: skipping (needs root, or not present)"
 fi
 
 # ---- stale rotated logs (root only) ------------------------------------
