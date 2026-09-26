@@ -147,5 +147,8 @@ fi
 echo "==> uv"
 "$DOTFILES_DIR/uv/setup.sh"
 
+echo "==> Claude Code"
+"$DOTFILES_DIR/claude/setup.sh"
+
 echo "==> Done. Start a new zsh session with: exec zsh"
 echo "    To make zsh your login shell: chsh -s \$(command -v zsh)"

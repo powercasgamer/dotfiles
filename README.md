@@ -48,6 +48,8 @@ dotfiles/
 │   └── setup.sh                  # installs pnpm, a Node.js package manager (run by install.sh)
 ├── uv/
 │   └── setup.sh                  # installs uv, a Python package/venv/tool manager (run by install.sh)
+├── claude/
+│   └── setup.sh                  # installs Claude Code via the native installer (run by install.sh)
 ├── docker/
 │   ├── setup.sh                # installs Docker Engine + Compose plugin (opt-in, NOT run by install.sh)
 │   └── daemon.json              # daemon hardening, installed to /etc/docker/daemon.json
@@ -189,7 +191,7 @@ It extends Renovate's `config:recommended` and additionally tracks
 version outside a Dockerfile/GitHub Actions context Renovate understands
 natively). `java/Dockerfile`'s base images and every
 `uses: owner/action@version` in `.github/workflows/*.yml` are covered
-automatically. bun/pnpm/uv/SDKMAN's installers always fetch latest, so
+automatically. bun/pnpm/uv/SDKMAN/Claude Code's installers always fetch latest, so
 there's no pinned version in those scripts for Renovate to bump.
 
 ## Suggestions plugin
@@ -444,6 +446,22 @@ it to skip touching any profile file at all — it installs `uv`/`uvx`
 straight into `~/.local/bin`, which is already on `PATH` via
 `zsh/exports/core/exports.zsh`, so no dedicated `exports/*.zsh` file is
 needed for it.
+
+## Claude Code setup (`claude/setup.sh`)
+
+Unprivileged, like `uv/setup.sh` — installs into `~/.local/bin`, no root
+needed, so it's run automatically by `install.sh`. Uses the official
+native installer (`curl -fsSL https://claude.ai/install.sh | bash`), which
+refuses to run under sudo anyway. Safe to re-run: skips the download if
+`~/.local/bin/claude` already exists; after that Claude Code keeps itself
+up to date.
+
+The installer ends with `claude install`, which may append a PATH snippet
+to `~/.zshrc`. Since `~/.zshrc` here is a symlink into this tracked repo,
+`claude/setup.sh` puts `~/.local/bin` on `PATH` before running it and, as
+a backstop, truncates any appended lines back off afterward — same
+approach as `bun/setup.sh`. `~/.local/bin` is already on `PATH` via
+`zsh/exports/core/exports.zsh`.
 
 ## Docker setup (`docker/setup.sh`)
 
