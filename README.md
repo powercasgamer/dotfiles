@@ -50,6 +50,8 @@ dotfiles/
 │   └── setup.sh                  # installs uv, a Python package/venv/tool manager (run by install.sh)
 ├── claude/
 │   └── setup.sh                  # installs Claude Code via the native installer (run by install.sh)
+├── wakatime/
+│   └── setup.sh                  # wakatime-cli, ~/.wakatime.cfg, zsh + Claude Code plugins (run by install.sh)
 ├── docker/
 │   ├── setup.sh                # installs Docker Engine + Compose plugin (opt-in, NOT run by install.sh)
 │   └── daemon.json              # daemon hardening, installed to /etc/docker/daemon.json
@@ -76,6 +78,7 @@ dotfiles/
     │   ├── core/exports.zsh        # locale, EDITOR, history size, PATH, less colors
     │   ├── ssh/ssh-agent.zsh       # starts/reuses one ssh-agent, loads the git signing key
     │   ├── sdkman/sdkman.zsh       # SDKMAN_DIR + sources sdkman-init.sh, if installed
+    │   ├── wakatime/wakatime.zsh   # points the wakatime zsh plugin at ~/.wakatime/wakatime-cli
     │   └── node/nvm.zsh            # NVM_DIR + sources nvm.sh, if installed
     └── functions/
         ├── core/functions.zsh      # mkcd, bak, psgrep, bsha256/bsha512, rsync-copy, dl, paste
@@ -462,6 +465,31 @@ to `~/.zshrc`. Since `~/.zshrc` here is a symlink into this tracked repo,
 a backstop, truncates any appended lines back off afterward — same
 approach as `bun/setup.sh`. `~/.local/bin` is already on `PATH` via
 `zsh/exports/core/exports.zsh`.
+
+## WakaTime setup (`wakatime/setup.sh`)
+
+Unprivileged, run automatically by `install.sh` (skipped with a note if
+`unzip` is missing). Sets up [WakaTime](https://wakatime.com) time tracking:
+
+- **wakatime-cli** in `~/.wakatime/`, with the `wakatime-cli` symlink the
+  official editor plugins look for, so JetBrains/VS Code reuse it.
+- **`~/.wakatime.cfg`** — asks for your API key
+  ([wakatime.com/api-key](https://wakatime.com/api-key)) once, in an
+  interactive run, and writes it `chmod 600`. The key is never stored in
+  this repo, and an existing `api_key` is never overwritten.
+- **Terminal tracking** via
+  [wakatime-zsh-plugin](https://github.com/sobolevn/wakatime-zsh-plugin),
+  cloned into Oh My Zsh's custom plugins. `zsh/zshrc` only enables it once
+  both the CLI and the plugin exist, so fresh machines don't warn. Put a
+  `.wakatime-project` file in a repo to override its project name; set
+  `WAKATIME_DO_NOT_TRACK=true` to pause tracking in a shell.
+- **Claude Code tracking** via the official
+  [claude-code-wakatime](https://github.com/wakatime/claude-code-wakatime)
+  plugin, if `claude` is installed. Its hooks run on `node`, so they need
+  nvm's node on `PATH`.
+
+Safe to re-run: each step skips if already done. The CLI isn't upgraded
+here; the editor and Claude Code plugins keep it up to date.
 
 ## Docker setup (`docker/setup.sh`)
 

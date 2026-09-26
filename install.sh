@@ -150,5 +150,13 @@ echo "==> uv"
 echo "==> Claude Code"
 "$DOTFILES_DIR/claude/setup.sh"
 
+echo "==> WakaTime"
+if command -v unzip >/dev/null 2>&1; then
+  "$DOTFILES_DIR/wakatime/setup.sh"
+else
+  echo "    unzip not installed (needs root, so not run automatically here):"
+  echo "    sudo apt install -y unzip && ~/dotfiles/wakatime/setup.sh"
+fi
+
 echo "==> Done. Start a new zsh session with: exec zsh"
 echo "    To make zsh your login shell: chsh -s \$(command -v zsh)"

@@ -16,7 +16,11 @@ ZSH_THEME="agnoster"
 #   z                     - `z <partial-dir-name>` jumps to frecent directories
 #   zsh-completions       - extra completion definitions
 #   zsh-autosuggestions   - fish-style suggestions from history as you type (-> right arrow to accept)
+#   wakatime              - terminal time tracking; only enabled once wakatime/setup.sh
+#                           has installed the CLI and cloned the plugin
 #   zsh-syntax-highlighting - must stay last: colors commands green/red as valid/invalid
+_wakatime=()
+[ -x "$HOME/.wakatime/wakatime-cli" ] && [ -d "$ZSH/custom/plugins/wakatime" ] && _wakatime=(wakatime)
 plugins=(
   sudo
   command-not-found
@@ -24,8 +28,10 @@ plugins=(
   z
   zsh-completions
   zsh-autosuggestions
+  $_wakatime
   zsh-syntax-highlighting
 )
+unset _wakatime
 
 source "$ZSH/oh-my-zsh.sh"
 
