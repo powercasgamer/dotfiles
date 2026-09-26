@@ -82,6 +82,7 @@ dotfiles/
     │   └── node/nvm.zsh            # NVM_DIR + sources nvm.sh, if installed
     └── functions/
         ├── core/functions.zsh      # mkcd, bak, psgrep, bsha256/bsha512, rsync-copy, dl, paste
+        ├── dotfiles/functions.zsh  # dotfiles-update (git pull + re-run install.sh)
         ├── gradle/functions.zsh    # killgradlehard, killgradle (force/graceful daemon kill)
         ├── git/functions.zsh      # gsfp, gcpp, gca, gsca, gpush
         └── system/functions.zsh   # killgateway
@@ -106,9 +107,11 @@ exec zsh
 directly, same as git-lfs.)
 
 `install.sh` is idempotent — re-run it any time (e.g. after pulling updates)
-and it will skip anything already installed. `tmux` is optional: if it's not
-installed when `install.sh` runs, the tmux step is skipped (with a note)
-rather than failing the whole script — install `tmux` and re-run any time.
+and it will skip anything already installed. `dotfiles-update` does both in
+one go: `git pull --ff-only` in `~/dotfiles`, then `install.sh`.
+
+`tmux` is optional: if it's not installed when `install.sh` runs, the tmux
+step is skipped (with a note) rather than failing the whole script — install `tmux` and re-run any time.
 Same for `zip`/`unzip`, needed by the SDKMAN installer (and `unzip` by the
 bun installer): if either is missing, those steps are skipped (with a note)
 instead of failing the script.
