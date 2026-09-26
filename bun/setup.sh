@@ -20,10 +20,12 @@ echo "==> bun"
 if [ -x "$HOME/.bun/bin/bun" ]; then
   echo "    already installed, skipping"
 else
-  if ! command -v curl >/dev/null 2>&1; then
-    echo "Missing 'curl'. Install it first, e.g.: sudo apt install -y curl"
-    exit 1
-  fi
+  for cmd in curl unzip; do
+    if ! command -v "$cmd" >/dev/null 2>&1; then
+      echo "Missing '$cmd'. Install it first, e.g.: sudo apt install -y $cmd"
+      exit 1
+    fi
+  done
 
   ZSHRC="$HOME/.zshrc"
   [ -L "$ZSHRC" ] && ZSHRC="$(readlink -f "$ZSHRC")"

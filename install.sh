@@ -94,7 +94,12 @@ echo "==> nvm"
 "$DOTFILES_DIR/nvm/setup.sh"
 
 echo "==> bun"
-"$DOTFILES_DIR/bun/setup.sh"
+if command -v unzip >/dev/null 2>&1; then
+  "$DOTFILES_DIR/bun/setup.sh"
+else
+  echo "    unzip not installed (needs root, so not run automatically here):"
+  echo "    sudo apt install -y unzip && ~/dotfiles/bun/setup.sh"
+fi
 
 echo "==> pnpm"
 "$DOTFILES_DIR/pnpm/setup.sh"

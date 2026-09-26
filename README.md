@@ -104,8 +104,9 @@ directly, same as git-lfs.)
 and it will skip anything already installed. `tmux` is optional: if it's not
 installed when `install.sh` runs, the tmux step is skipped (with a note)
 rather than failing the whole script — install `tmux` and re-run any time.
-Same for `zip`/`unzip`, needed by the SDKMAN installer: if either is
-missing, that step is skipped (with a note) instead of failing the script.
+Same for `zip`/`unzip`, needed by the SDKMAN installer (and `unzip` by the
+bun installer): if either is missing, those steps are skipped (with a note)
+instead of failing the script.
 
 To make zsh your login shell: `chsh -s $(command -v zsh)` (needs a real
 terminal for the password prompt).
