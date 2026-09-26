@@ -1,7 +1,16 @@
 # --- locale ---
-export LANG="en_US.UTF-8"
-export LANGUAGE="en_US.UTF-8"
-export LC_ALL="en_US.UTF-8"
+# Only claim en_US.UTF-8 if it's actually generated -- fresh WSL/container
+# images often ship just C.UTF-8, and exporting a missing locale makes
+# manpath, perl, etc. warn on every call. Fix properly with:
+#   sudo locale-gen en_US.UTF-8
+if locale -a 2>/dev/null | grep -qix 'en_US\.utf-\?8'; then
+  export LANG="en_US.UTF-8"
+  export LANGUAGE="en_US.UTF-8"
+  export LC_ALL="en_US.UTF-8"
+else
+  export LANG="C.UTF-8"
+  export LC_ALL="C.UTF-8"
+fi
 
 # --- editor ---
 export EDITOR="nano"
