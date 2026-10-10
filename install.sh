@@ -128,8 +128,11 @@ else
   echo "    sudo ~/dotfiles/flatpak/setup.sh"
 fi
 
-echo "==> apt speedup (optional, skips translation index files on apt update)"
-if [ -e /etc/apt/apt.conf.d/99dotfiles-no-translations ]; then
+echo "==> apt speedup (optional, skips translation + AppStream index files on apt update)"
+if [ -e /etc/apt/apt.conf.d/99dotfiles-no-translations ] &&
+   { [ -e /etc/apt/apt.conf.d/99dotfiles-no-appstream ] ||
+     command -v gnome-software >/dev/null 2>&1 ||
+     command -v plasma-discover >/dev/null 2>&1; }; then
   echo "    already configured"
 else
   echo "    not configured (needs root, so not run automatically here):"

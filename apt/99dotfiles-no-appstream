@@ -1,0 +1,8 @@
+// Managed by dotfiles (apt/setup.sh). Skips downloading AppStream (DEP-11)
+// component metadata during `apt update` -- it's only read by GUI software
+// centers (GNOME Software, KDE Discover) to list apps with icons and
+// screenshots, not by apt itself, so skipping it makes `apt update` faster
+// with no change in install behavior. apt/setup.sh doesn't install this
+// file when a software center is present. Safe to delete this file to
+// revert.
+Acquire::IndexTargets::deb::DEP-11::DefaultEnabled "false";

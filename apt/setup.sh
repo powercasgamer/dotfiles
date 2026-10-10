@@ -1,9 +1,13 @@
 #!/usr/bin/env bash
-# Speeds up `apt update` by dropping in a config that skips downloading
-# translation index files (Translation-en, etc.) -- they're only used for
-# localized package descriptions, not for resolving or installing
-# anything. Does not touch Install-Recommends/Suggests or any other apt
-# default.
+# Speeds up `apt update` by dropping in configs that skip downloading
+# index files apt itself never reads:
+#   - 99dotfiles-no-translations: Translation-* files, only used for
+#     localized package descriptions.
+#   - 99dotfiles-no-appstream: AppStream (DEP-11) metadata, only used by
+#     GUI software centers. Skipped if GNOME Software or KDE Discover is
+#     installed, since they'd lose their apt app listings.
+# Neither changes what gets resolved or installed. Does not touch
+# Install-Recommends/Suggests or any other apt default.
 #
 # Must run as root (writes to /etc/apt/apt.conf.d/). NOT run automatically
 # by install.sh -- like docker/setup.sh and flatpak/setup.sh, this needs
@@ -12,7 +16,7 @@
 # Usage:
 #   sudo ~/dotfiles/apt/setup.sh
 #
-# Safe to re-run: skips writing if the config is already in place, and
+# Safe to re-run: skips writing a config that's already in place, and
 # backs up any pre-existing file at the destination first.
 set -euo pipefail
 
@@ -22,17 +26,27 @@ if [ "$(id -u)" -ne 0 ]; then
 fi
 
 APT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-DEST=/etc/apt/apt.conf.d/99dotfiles-no-translations
 
-if cmp -s "$APT_DIR/99dotfiles-no-translations" "$DEST" 2>/dev/null; then
-  echo "==> apt speedup config already in place, skipping"
-else
-  if [ -e "$DEST" ]; then
-    cp "$DEST" "$DEST.bak.$(date +%Y%m%d%H%M%S)"
-    echo "    backed up existing $DEST"
+install_conf() {
+  local name="$1" dest="/etc/apt/apt.conf.d/$1"
+  if cmp -s "$APT_DIR/$name" "$dest" 2>/dev/null; then
+    echo "==> $name already in place, skipping"
+    return
   fi
-  cp "$APT_DIR/99dotfiles-no-translations" "$DEST"
-  echo "==> Wrote $DEST"
+  if [ -e "$dest" ]; then
+    cp "$dest" "$dest.bak.$(date +%Y%m%d%H%M%S)"
+    echo "    backed up existing $dest"
+  fi
+  cp "$APT_DIR/$name" "$dest"
+  echo "==> Wrote $dest"
+}
+
+install_conf 99dotfiles-no-translations
+
+if command -v gnome-software >/dev/null 2>&1 || command -v plasma-discover >/dev/null 2>&1; then
+  echo "==> GUI software center found, leaving AppStream metadata enabled"
+else
+  install_conf 99dotfiles-no-appstream
 fi
 
-echo "==> Done. apt update will now skip Translation-* index files."
+echo "==> Done. apt update will now skip index files apt doesn't use."
