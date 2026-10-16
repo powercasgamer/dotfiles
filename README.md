@@ -130,6 +130,42 @@ system package + daemon, unlike everything else here) — see the Docker
 section below. Same for the storage cleanup timer and the Python install —
 see the Cleanup and Python sections below.
 
+### As root
+
+Everything works when logged in as root directly (a VPS or container with
+no regular user, and often no `sudo`). Drop the `sudo`s:
+
+```bash
+apt update && apt install -y git
+git clone <this-repo-url> ~/dotfiles    # i.e. /root/dotfiles
+~/dotfiles/install.sh                   # installs the base packages itself
+exec zsh
+```
+
+What changes when you're root:
+
+- **`install.sh` installs the base packages itself** (runs
+  `packages/setup.sh` first), since it has the rights to. The other
+  root-only scripts — Docker, cleanup timer, micro, Flatpak, apt speedup,
+  Python, SSH hardening, firewall — stay opt-in; their hints are just
+  printed without `sudo`.
+- **Root-only scripts that act on behalf of a user** (`micro/`, `cleanup/`,
+  `docker/setup.sh`) default to the user who ran `sudo`, or to root when
+  there was no `sudo`. So `micro/setup.sh` links root's settings, and
+  `docker/setup.sh` skips the docker group (root doesn't need it). Pass a
+  username to target someone else.
+- **zsh aliases** `update`, `install`, `autoremove` and `ports` drop their
+  `sudo` prefix.
+- Everything lands in `/root` as usual: `/root/.zshrc`,
+  `/root/.dotfiles-backups/`, `/root/.local/bin/claude`, and so on.
+
+Running `install.sh` **through** `sudo` from a regular account
+(`sudo ~/dotfiles/install.sh`) isn't the same thing and isn't supported:
+it links root's `~/.zshrc` and `~/.tmux.conf` into that user's copy of the
+repo, which they can edit — a way into root. Run it as the user it's for,
+and `sudo` only the scripts that need it. To set up root as well, give
+root its own clone (`/root/dotfiles`) and run it as root.
+
 ## Adopting on a machine that already has its own config
 
 For a machine that's in use and set up its own way — its own `~/.zshrc`
