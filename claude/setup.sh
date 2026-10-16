@@ -53,7 +53,7 @@ fi
 echo "==> Enabling Remote Control at startup"
 SETTINGS="$HOME/.claude/settings.json"
 if ! command -v jq >/dev/null 2>&1; then
-  echo "    'jq' is missing, skipping. Install it (sudo apt install -y jq) and re-run,"
+  echo "    'jq' is missing, skipping. Install it (sudo ~/dotfiles/packages/setup.sh) and re-run,"
   echo "    or enable it from /config inside Claude Code."
 else
   mkdir -p "$(dirname "$SETTINGS")"

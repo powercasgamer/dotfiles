@@ -9,7 +9,7 @@ ZSH_CUSTOM="${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}"
 echo "==> Checking dependencies"
 for cmd in zsh git curl; do
   if ! command -v "$cmd" >/dev/null 2>&1; then
-    echo "Missing '$cmd'. Install it first, e.g.: sudo apt install -y zsh git curl"
+    echo "Missing '$cmd'. Install the base packages first: sudo ~/dotfiles/packages/setup.sh"
     exit 1
   fi
 done

@@ -60,6 +60,8 @@ dotfiles/
 │   └── setup.sh                 # installs a weekly systemd timer for it (opt-in, NOT run by install.sh)
 ├── python/
 │   └── setup.sh                  # installs python3 + python3-dev via apt (opt-in, NOT run by install.sh)
+├── packages/
+│   └── setup.sh                  # apt: zsh git curl tmux nano zip unzip jq (run first, as root; NOT run by install.sh)
 └── zsh/
     ├── zshrc                       # main config (becomes ~/.zshrc via symlink)
     ├── zshrc.local.example         # template -> ~/.zshrc.local (host tweaks, not tracked)
@@ -97,8 +99,9 @@ category is just making a new folder and dropping a `.zsh` file in it, e.g.
 ## Set up on a new machine
 
 ```bash
-sudo apt update && sudo apt install -y zsh git curl tmux   # if not already present
+sudo apt update && sudo apt install -y git   # just enough to clone
 git clone <this-repo-url> ~/dotfiles    # or scp/rsync the folder over
+sudo ~/dotfiles/packages/setup.sh       # zsh, curl, tmux, nano, zip/unzip, jq
 ~/dotfiles/install.sh
 exec zsh
 ```
@@ -665,3 +668,22 @@ a real script rather than a one-line dependency check like `zsh`/`git`/
 `pip`, `venv`, and `pipx` are deliberately not installed here — see
 [uv setup](#uv-setup-uvsetupsh) above, which `install.sh` runs
 automatically without root and which replaces all three.
+
+## Base packages (`packages/setup.sh`)
+
+Needs root (apt), so it's never run automatically by `install.sh` — run it
+once on a new machine, before `install.sh`:
+
+```bash
+sudo ~/dotfiles/packages/setup.sh
+```
+
+Installs everything the unprivileged scripts expect to already be there,
+so `install.sh` doesn't stop or skip steps with "not installed" notes:
+
+- `zsh`, `git`, `curl` — hard requirements of `install.sh` itself
+- `tmux`, `nano` — configured by `tmux/setup.sh` and `nano/setup.sh`
+- `zip`, `unzip` — used by the SDKMAN, bun and WakaTime installers
+- `jq` — used by `claude/setup.sh` to edit `~/.claude/settings.json`
+
+Only missing packages are installed, so it's safe to re-run any time.
