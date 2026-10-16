@@ -24,3 +24,7 @@ desktop.ini
 .env
 .env.local
 .env.*.local
+
+# Machine-local overrides (settings.local.json, CLAUDE.local.md, ...)
+*.local
+*.local.*
