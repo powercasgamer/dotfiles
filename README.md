@@ -304,6 +304,10 @@ TUIs) behave inside tmux the way they do in a bare terminal:
 - `allow-passthrough on` — notification escape sequences reach the outer
   terminal.
 
+Claude Code rings the terminal bell when it's waiting for input, and
+`conf.d/statusbar.conf` paints a window that rang it red in the status
+bar — so a backgrounded `claude-tmux` window that needs you stands out.
+
 ## SSH setup (`ssh/`)
 
 Client and server hardening are split into two separate scripts with very
