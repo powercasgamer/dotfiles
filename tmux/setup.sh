@@ -23,7 +23,21 @@ else
   echo "    already installed, skipping"
 fi
 
+# Cloned directly rather than via TPM's bin/install_plugins: that asks a
+# running tmux server for TMUX_PLUGIN_MANAGER_PATH, which only exists once a
+# server has loaded this config -- so it aborts on a fresh machine or
+# whenever no tmux is running. A plugin install is just a clone into
+# ~/.tmux/plugins/<name>, which is all this does. Updates still go
+# through TPM inside tmux (<prefix> U).
 echo "==> Installing tmux plugins"
-"$HOME/.tmux/plugins/tpm/bin/install_plugins" >/dev/null
+grep -oE "^set -g @plugin '[^']+'" "$TMUX_DIR/conf.d/plugins.conf" | cut -d"'" -f2 |
+  while read -r plugin; do
+    dest="$HOME/.tmux/plugins/${plugin##*/}"
+    if [ -d "$dest" ]; then
+      echo "    ${plugin##*/} already present, skipping"
+    else
+      git clone --depth=1 "https://github.com/$plugin" "$dest"
+    fi
+  done
 
 echo "==> Done"
