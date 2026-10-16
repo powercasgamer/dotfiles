@@ -62,6 +62,10 @@ echo "==> Linking ~/.zshrc"
 [ -L "$HOME/.zshrc" ] || backup_file "$HOME/.zshrc"
 ln -sf "$DOTFILES_DIR/zsh/zshrc" "$HOME/.zshrc"
 
+echo "==> Linking ~/.zshenv"
+[ -L "$HOME/.zshenv" ] || backup_file "$HOME/.zshenv"
+ln -sf "$DOTFILES_DIR/zsh/zshenv" "$HOME/.zshenv"
+
 echo "==> Machine-local overrides / secrets"
 if [ ! -e "$HOME/.zshrc.local" ]; then
   cp "$DOTFILES_DIR/zsh/zshrc.local.example" "$HOME/.zshrc.local"

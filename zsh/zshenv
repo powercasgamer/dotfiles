@@ -1,0 +1,3 @@
+# Read by every zsh, including non-interactive ones (ssh commands, JetBrains Gateway's
+# remote-dev backend), so Gradle sees the ORG_GRADLE_PROJECT_* credentials there too.
+[ -r "$HOME/.zshrc.secrets" ] && source "$HOME/.zshrc.secrets"
