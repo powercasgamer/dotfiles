@@ -13,7 +13,7 @@
 #   sudo ~/dotfiles/micro/setup.sh [username]
 #
 # username is whose ~/.config/micro/settings.json gets linked; defaults to
-# $SUDO_USER (whoever ran sudo) if not given. Resolved explicitly via
+# $SUDO_USER (whoever ran sudo), or root when run as root without sudo. Resolved explicitly via
 # getent rather than $HOME, since $HOME under sudo is root's home, not
 # the invoking user's.
 #
@@ -29,7 +29,9 @@ fi
 MICRO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=../lib/backup.sh
 source "$MICRO_DIR/../lib/backup.sh"
-TARGET_USER="${1:-${SUDO_USER:-}}"
+# Whoever ran sudo; or, logged in as root directly (no sudo, so no
+# $SUDO_USER), root itself -- same fallback as cleanup.sh.
+TARGET_USER="${1:-${SUDO_USER:-$(id -un)}}"
 
 if command -v micro >/dev/null 2>&1; then
   echo "==> micro already installed, skipping install"
@@ -40,7 +42,7 @@ else
 fi
 
 if [ -z "$TARGET_USER" ] || ! id "$TARGET_USER" >/dev/null 2>&1; then
-  echo "==> No valid target user given (and \$SUDO_USER unset) -- skipping settings.json link."
+  echo "==> User '$TARGET_USER' does not exist -- skipping settings.json link."
   echo "    Link it yourself: ln -sf $MICRO_DIR/settings.json ~/.config/micro/settings.json"
 else
   TARGET_HOME="$(getent passwd "$TARGET_USER" | cut -d: -f6)"

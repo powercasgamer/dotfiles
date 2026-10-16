@@ -10,7 +10,7 @@
 #   sudo ~/dotfiles/cleanup/setup.sh [username]
 #
 # username is whose trash/thumbnail cache gets cleaned; defaults to
-# $SUDO_USER (whoever ran sudo) if not given.
+# $SUDO_USER (whoever ran sudo), or root when run as root without sudo.
 #
 # Safe to re-run: overwrites the unit files and reloads systemd.
 set -euo pipefail
@@ -21,10 +21,12 @@ if [ "$(id -u)" -ne 0 ]; then
 fi
 
 CLEANUP_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-TARGET_USER="${1:-${SUDO_USER:-}}"
+# Whoever ran sudo; or, logged in as root directly (no sudo, so no
+# $SUDO_USER), root itself -- same fallback as cleanup.sh.
+TARGET_USER="${1:-${SUDO_USER:-$(id -un)}}"
 
 if [ -z "$TARGET_USER" ] || ! id "$TARGET_USER" >/dev/null 2>&1; then
-  echo "No valid target user given (and \$SUDO_USER unset)." >&2
+  echo "User '$TARGET_USER' does not exist." >&2
   echo "Usage: sudo $0 <username>" >&2
   exit 1
 fi

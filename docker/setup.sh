@@ -9,7 +9,9 @@
 # Usage:
 #   sudo ~/dotfiles/docker/setup.sh [username]
 #
-# username defaults to $SUDO_USER (whoever ran sudo) if not given.
+# username defaults to $SUDO_USER (whoever ran sudo), or root when run as
+# root without sudo -- in which case group membership is skipped, since
+# root can use docker already.
 #
 # Being in the docker group is equivalent to passwordless root on this
 # machine -- anyone in it can bind-mount the host filesystem into a
@@ -29,7 +31,9 @@ fi
 DOCKER_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=../lib/backup.sh
 source "$DOCKER_DIR/../lib/backup.sh"
-TARGET_USER="${1:-${SUDO_USER:-}}"
+# Whoever ran sudo; or, logged in as root directly (no sudo, so no
+# $SUDO_USER), root itself -- same fallback as cleanup.sh.
+TARGET_USER="${1:-${SUDO_USER:-$(id -un)}}"
 
 if command -v docker >/dev/null 2>&1 && docker compose version >/dev/null 2>&1; then
   echo "==> Docker Engine + Compose already installed, skipping install"
@@ -67,7 +71,10 @@ else
 fi
 
 echo "==> docker group"
-if [ -n "$TARGET_USER" ]; then
+if [ "$(id -u "$TARGET_USER" 2>/dev/null)" = 0 ]; then
+  echo "    $TARGET_USER is root, which can use docker already -- skipping."
+  echo "    For another account: usermod -aG docker <username>"
+else
   if id "$TARGET_USER" >/dev/null 2>&1; then
     usermod -aG docker "$TARGET_USER"
     echo "    added $TARGET_USER to the docker group"
@@ -76,9 +83,6 @@ if [ -n "$TARGET_USER" ]; then
   else
     echo "    user '$TARGET_USER' does not exist, skipping group membership"
   fi
-else
-  echo "    no target user given (and \$SUDO_USER unset) -- skipping."
-  echo "    run: sudo usermod -aG docker <username>"
 fi
 
 echo "==> Done"
