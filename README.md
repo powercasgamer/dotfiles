@@ -127,6 +127,93 @@ system package + daemon, unlike everything else here) — see the Docker
 section below. Same for the storage cleanup timer and the Python install —
 see the Cleanup and Python sections below.
 
+## Updating a live machine (or one on an older config)
+
+Everything here is safe to apply to a machine that's in use — nothing
+restarts tmux, kills sessions, or touches running processes. New config
+just takes effect in each shell/tool as you reload it.
+
+### 1. Get the new version of the repo
+
+```bash
+cd ~/dotfiles
+git status                 # local edits? commit or `git stash` them first
+git pull --ff-only
+```
+
+- **`git pull --ff-only` refuses** because the copy has local commits:
+  `git pull --rebase`, or push those commits somewhere first.
+- **No `.git` in `~/dotfiles`** (it was scp'd/rsync'd over): move it aside
+  and re-clone — `mv ~/dotfiles ~/dotfiles.old && git clone <this-repo-url>
+  ~/dotfiles` — then diff `~/dotfiles.old` for anything worth keeping.
+- **Recent enough to have `dotfiles-update`**: that's `git pull --ff-only`
+  plus step 3 in one command. Older machines won't have it until after the
+  first manual pull.
+
+### 2. Install any new base packages (root)
+
+```bash
+sudo ~/dotfiles/packages/setup.sh
+```
+
+Only installs what's missing. Machines set up before this script existed
+are usually missing `jq` (and sometimes `zip`/`unzip`).
+
+### 3. Re-run the installer
+
+```bash
+~/dotfiles/install.sh
+```
+
+Idempotent: tools already installed are skipped, config is re-linked.
+What happens to config from before this repo managed it:
+
+- **`~/.zshrc` / `~/.tmux.conf` that are real files** (not symlinks) get
+  moved to `~/.zshrc.bak.<timestamp>` / `~/.tmux.conf.bak.<timestamp>`
+  and replaced with symlinks into the repo. Nothing is deleted — go through
+  the backup and move what you still want into:
+  - `~/.zshrc.local` — machine-specific aliases, PATH entries, tweaks
+  - `~/.zshrc.secrets` — tokens and keys (`chmod 600`, never tracked)
+
+  Both are created from templates on the first run and never overwritten.
+  Don't edit `zsh/zshrc` itself for per-machine changes — it's shared.
+- **Installer-appended PATH lines** (nvm, SDKMAN, bun, Claude Code…) in the
+  old `~/.zshrc` aren't needed — each tool has its own file under
+  `zsh/exports/`.
+- **git identity** is kept if already set; `git/setup.sh` only prompts
+  when it's missing.
+- **Claude Code**: an existing install is left alone (it self-updates);
+  only `remoteControlAtStartup` is merged into `~/.claude/settings.json`,
+  the rest of that file is untouched.
+
+### 4. Load the new config without restarting anything
+
+| What | How | Notes |
+|---|---|---|
+| zsh | `exec zsh` in each open shell | New shells pick it up automatically. |
+| tmux | `<prefix> r` (or `tmux source-file ~/.tmux.conf`) | Applies to every session on the server; running panes aren't touched. **Don't** `tmux kill-server` — that kills anything running inside, Claude sessions included. |
+| tmux plugins | `<prefix> I` | Only if `conf.d/plugins.conf` gained a plugin. |
+| Claude Code | start a new session | Settings are read at startup; a running session can turn Remote Control on with `/remote-control`. |
+
+Some tmux settings only work if the terminal *outside* tmux supports them
+too — e.g. Shift+Enter in Claude needs an outer terminal that sends
+extended keys. If it still submits, try the same key outside tmux first.
+
+### 5. Check it worked
+
+```bash
+readlink ~/.zshrc ~/.tmux.conf                     # both point into ~/dotfiles
+tmux show -sv extended-keys                        # on
+jq .remoteControlAtStartup ~/.claude/settings.json # true
+```
+
+### Rolling back
+
+`cd ~/dotfiles && git log` to find the last good commit, `git checkout
+<commit>`, re-run step 4. Old `~/.zshrc` / `~/.tmux.conf` files are still
+in their `.bak.<timestamp>` copies if you need to put one back (remove the
+symlink first).
+
 ## Creating a new user with this setup already applied
 
 ```bash
