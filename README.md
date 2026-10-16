@@ -127,79 +127,107 @@ system package + daemon, unlike everything else here) — see the Docker
 section below. Same for the storage cleanup timer and the Python install —
 see the Cleanup and Python sections below.
 
-## Updating a live machine (or one on an older config)
+## Adopting on a machine that already has its own config
 
-Everything here is safe to apply to a machine that's in use — nothing
-restarts tmux, kills sessions, or touches running processes. New config
-just takes effect in each shell/tool as you reload it.
+For a machine that's in use and set up its own way — its own `~/.zshrc`
+(maybe an older Oh My Zsh, or another framework), `~/.tmux.conf`,
+`~/.gitconfig` — with tmux sessions and Claude Code running that you
+don't want to lose.
 
-### 1. Get the new version of the repo
+`install.sh` never deletes anything, but it **does** replace or change
+some of what's there. Know what before running it:
+
+| Existing thing | What `install.sh` does to it |
+|---|---|
+| `~/.zshrc`, `~/.tmux.conf`, `~/.nanorc` | Moved to `<file>.bak.<timestamp>`, replaced by a symlink into the repo. |
+| `~/.oh-my-zsh` | Reused as-is — not reinstalled or updated. Custom themes/plugins in it are kept. |
+| `~/.gitconfig` | Identity kept. Overwrites `init.defaultBranch`, `pull.rebase` (→ `false`), `push.autoSetupRemote`, `core.editor` (→ `nano`), `rerere.enabled`, `color.ui`, **`core.excludesfile` / `core.attributesfile`** (→ this repo's files). If `~/.ssh/id_ed25519.pub` exists, turns on SSH commit/tag signing and **rewrites `~/.ssh/allowed_signers`**. |
+| `~/.ssh/config` | One `Include` line appended at the end; your `Host` blocks keep priority. |
+| nvm, SDKMAN, bun, uv, Claude Code… | Skipped if already installed. |
+| `~/.claude/settings.json` | Only `remoteControlAtStartup` set to `true`. |
+| `~/.bashrc`, login shell | Untouched. |
+
+### 0. Optional: try it on a throwaway user first
 
 ```bash
-cd ~/dotfiles
-git status                 # local edits? commit or `git stash` them first
-git pull --ff-only
+sudo ~/dotfiles/new-user.sh dotfiles-test --no-password
+sudo -iu dotfiles-test          # look around, then: sudo userdel -r dotfiles-test
 ```
 
-- **`git pull --ff-only` refuses** because the copy has local commits:
-  `git pull --rebase`, or push those commits somewhere first.
-- **No `.git` in `~/dotfiles`** (it was scp'd/rsync'd over): move it aside
-  and re-clone — `mv ~/dotfiles ~/dotfiles.old && git clone <this-repo-url>
-  ~/dotfiles` — then diff `~/dotfiles.old` for anything worth keeping.
-- **Recent enough to have `dotfiles-update`**: that's `git pull --ff-only`
-  plus step 3 in one command. Older machines won't have it until after the
-  first manual pull.
+Same setup, without touching your own account.
 
-### 2. Install any new base packages (root)
+### 1. Snapshot what's there
 
 ```bash
-sudo ~/dotfiles/packages/setup.sh
+mkdir -p ~/pre-dotfiles
+cp -a ~/.zshrc ~/.tmux.conf ~/.nanorc ~/.gitconfig ~/.ssh/config \
+      ~/.ssh/allowed_signers ~/pre-dotfiles/ 2>/dev/null
+git config --global --list > ~/pre-dotfiles/gitconfig.list
 ```
 
-Only installs what's missing. Machines set up before this script existed
-are usually missing `jq` (and sometimes `zip`/`unzip`).
+The `.bak` files cover the symlinked ones, but `~/.gitconfig` is edited in
+place and has no backup otherwise.
 
-### 3. Re-run the installer
+### 2. Get the repo and install
 
 ```bash
+git clone <this-repo-url> ~/dotfiles
+sudo ~/dotfiles/packages/setup.sh       # base apt packages, only what's missing
 ~/dotfiles/install.sh
 ```
 
-Idempotent: tools already installed are skipped, config is re-linked.
-What happens to config from before this repo managed it:
+Nothing running is touched yet — open shells and the tmux server keep
+their old config until you reload them (step 4).
 
-- **`~/.zshrc` / `~/.tmux.conf` that are real files** (not symlinks) get
-  moved to `~/.zshrc.bak.<timestamp>` / `~/.tmux.conf.bak.<timestamp>`
-  and replaced with symlinks into the repo. Nothing is deleted — go through
-  the backup and move what you still want into:
-  - `~/.zshrc.local` — machine-specific aliases, PATH entries, tweaks
-  - `~/.zshrc.secrets` — tokens and keys (`chmod 600`, never tracked)
+### 3. Port your old config across
 
-  Both are created from templates on the first run and never overwritten.
-  Don't edit `zsh/zshrc` itself for per-machine changes — it's shared.
-- **Installer-appended PATH lines** (nvm, SDKMAN, bun, Claude Code…) in the
-  old `~/.zshrc` aren't needed — each tool has its own file under
-  `zsh/exports/`.
-- **git identity** is kept if already set; `git/setup.sh` only prompts
-  when it's missing.
-- **Claude Code**: an existing install is left alone (it self-updates);
-  only `remoteControlAtStartup` is merged into `~/.claude/settings.json`,
-  the rest of that file is untouched.
+Don't edit `zsh/zshrc` for this machine's needs — it's shared across all
+machines. Go through `~/.zshrc.bak.*` and sort each part:
 
-### 4. Load the new config without restarting anything
+- **Aliases, functions, exports, PATH entries specific to this box** →
+  `~/.zshrc.local` (loaded last, so it overrides anything from the repo).
+- **Tokens, API keys, passwords** → `~/.zshrc.secrets` (`chmod 600`).
+- **Things every machine should have** → a new `.zsh` file under
+  `zsh/aliases/`, `zsh/exports/` or `zsh/functions/`, committed to the repo.
+- **Version-manager init lines** (nvm, SDKMAN, bun, pyenv-style `eval`s,
+  `export PATH=$HOME/.local/bin...`) → usually drop them; the repo has its
+  own under `zsh/exports/`. Keep only ones for tools the repo doesn't manage.
+- **`ZSH_THEME` / `plugins=(...)`** → can't be overridden from
+  `~/.zshrc.local`, since Oh My Zsh has already loaded by then. Change them
+  in `zsh/zshrc` (for everyone) or live with the repo's.
 
-| What | How | Notes |
-|---|---|---|
-| zsh | `exec zsh` in each open shell | New shells pick it up automatically. |
-| tmux | `<prefix> r` (or `tmux source-file ~/.tmux.conf`) | Applies to every session on the server; running panes aren't touched. **Don't** `tmux kill-server` — that kills anything running inside, Claude sessions included. |
-| tmux plugins | `<prefix> I` | Only if `conf.d/plugins.conf` gained a plugin. |
-| Claude Code | start a new session | Settings are read at startup; a running session can turn Remote Control on with `/remote-control`. |
+Gotchas coming from an older or different setup:
 
-Some tmux settings only work if the terminal *outside* tmux supports them
-too — e.g. Shift+Enter in Claude needs an outer terminal that sends
-extended keys. If it still submits, try the same key outside tmux first.
+- **Old Oh My Zsh**: it's reused, not updated — run `omz update`.
+- **Prezto, zinit, antidote, Powerlevel10k, starship…**: no longer loaded.
+  Either add the init line to `~/.zshrc.local` or drop it. (The theme here
+  is `agnoster`, which needs a Powerline/Nerd font in your terminal.)
+- **Behaviour changes**: `rm`/`cp`/`mv` become `-i` (interactive), and the
+  Oh My Zsh `git` plugin is deliberately off — its `gst`/`gco`/… aliases are
+  gone; see `zsh/aliases/git/aliases.zsh` for what's here instead.
+- **Old `~/.tmux.conf`**: different prefix or bindings you relied on go in
+  `tmux/conf.d/` (repo-wide) — there's no tmux equivalent of `.zshrc.local`.
+- **git**: compare `git config --global --list` with
+  `~/pre-dotfiles/gitconfig.list` and put back anything you need, e.g.
+  your own global ignore or `pull.rebase true`. If signing got switched on
+  and you don't want it: `git config --global commit.gpgsign false`.
 
-### 5. Check it worked
+### 4. Switch over without killing anything
+
+| What | How |
+|---|---|
+| zsh | `exec zsh` in each open shell (new shells already get it). `chsh -s "$(command -v zsh)"` if your login shell is still bash. |
+| tmux | `<prefix> r`, or `tmux source-file ~/.tmux.conf` — the server and everything in it (Claude sessions included) keeps running. |
+| Claude Code | New sessions pick up the settings; in a running one, `/remote-control`. |
+
+**tmux caveat:** sourcing a config *adds* to what the server already has;
+it doesn't clear it. Bindings or options from the old config (e.g. a
+`C-a` prefix) stay active alongside the new ones until the tmux server
+restarts. That's harmless, so do the restart (`tmux kill-server`, then
+`claude-tmux` / `tmux` again) whenever nothing important is running — not
+before.
+
+### 5. Check, and how to back out
 
 ```bash
 readlink ~/.zshrc ~/.tmux.conf                     # both point into ~/dotfiles
@@ -207,12 +235,34 @@ tmux show -sv extended-keys                        # on
 jq .remoteControlAtStartup ~/.claude/settings.json # true
 ```
 
-### Rolling back
+To back out: delete the symlinks, `mv` the `.bak.<timestamp>` files back
+into place, restore `~/.gitconfig` and `~/.ssh/allowed_signers` from
+`~/pre-dotfiles/`, and remove the `Include` line at the end of
+`~/.ssh/config`. Tools that got installed (nvm, uv, Claude Code…) live in
+your home directory and can be left or removed individually.
 
-`cd ~/dotfiles && git log` to find the last good commit, `git checkout
-<commit>`, re-run step 4. Old `~/.zshrc` / `~/.tmux.conf` files are still
-in their `.bak.<timestamp>` copies if you need to put one back (remove the
-symlink first).
+## Updating a machine already using these dotfiles
+
+```bash
+dotfiles-update     # = cd ~/dotfiles && git pull --ff-only && ./install.sh
+exec zsh
+```
+
+Then reload what changed, same as step 4 above: `<prefix> r` for tmux,
+`<prefix> I` if `conf.d/plugins.conf` gained a plugin, a new Claude session
+for Claude settings. If a pull added a new base package, also run
+`sudo ~/dotfiles/packages/setup.sh`.
+
+- **Local edits** in `~/dotfiles`: commit or `git stash` them first.
+- **`--ff-only` refuses** because the copy has its own commits:
+  `git pull --rebase`, or push those commits somewhere first.
+- **Very old copy without `dotfiles-update`**: run the three commands
+  by hand once; it exists afterwards.
+- **No `.git` in `~/dotfiles`** (scp'd/rsync'd over): treat it like the
+  adoption case above — move it aside, clone fresh, diff for anything
+  worth keeping.
+- **Rolling back**: `git log` to find the last good commit,
+  `git checkout <commit>`, reload as above.
 
 ## Creating a new user with this setup already applied
 
