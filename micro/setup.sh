@@ -27,6 +27,8 @@ if [ "$(id -u)" -ne 0 ]; then
 fi
 
 MICRO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=../lib/backup.sh
+source "$MICRO_DIR/../lib/backup.sh"
 TARGET_USER="${1:-${SUDO_USER:-}}"
 
 if command -v micro >/dev/null 2>&1; then
@@ -46,8 +48,10 @@ else
   echo "==> Linking $TARGET_HOME/.config/micro/settings.json"
   install -o "$TARGET_USER" -g "$TARGET_GROUP" -d "$TARGET_HOME/.config/micro"
   if [ -e "$TARGET_HOME/.config/micro/settings.json" ] && [ ! -L "$TARGET_HOME/.config/micro/settings.json" ]; then
-    mv "$TARGET_HOME/.config/micro/settings.json" "$TARGET_HOME/.config/micro/settings.json.bak.$(date +%Y%m%d%H%M%S)"
-    echo "    backed up existing settings.json"
+    # Into the target user's backup folder, not root's -- and handed back
+    # to them, since root just created it.
+    DOTFILES_BACKUP_HOME="$TARGET_HOME" backup_file "$TARGET_HOME/.config/micro/settings.json"
+    chown -R "$TARGET_USER:$TARGET_GROUP" "$TARGET_HOME/.dotfiles-backups"
   fi
   ln -sf "$MICRO_DIR/settings.json" "$TARGET_HOME/.config/micro/settings.json"
   chown -h "$TARGET_USER:$TARGET_GROUP" "$TARGET_HOME/.config/micro/settings.json"

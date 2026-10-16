@@ -4,6 +4,8 @@
 set -euo pipefail
 
 TMUX_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=../lib/backup.sh
+source "$TMUX_DIR/../lib/backup.sh"
 
 if ! command -v tmux >/dev/null 2>&1; then
   echo "tmux is not installed. Install it first, e.g.: sudo apt install -y tmux"
@@ -11,10 +13,7 @@ if ! command -v tmux >/dev/null 2>&1; then
 fi
 
 echo "==> Linking ~/.tmux.conf"
-if [ -e "$HOME/.tmux.conf" ] && [ ! -L "$HOME/.tmux.conf" ]; then
-  mv "$HOME/.tmux.conf" "$HOME/.tmux.conf.bak.$(date +%Y%m%d%H%M%S)"
-  echo "    backed up existing ~/.tmux.conf"
-fi
+[ -L "$HOME/.tmux.conf" ] || backup_file "$HOME/.tmux.conf"
 ln -sf "$TMUX_DIR/tmux.conf" "$HOME/.tmux.conf"
 
 echo "==> Installing TPM (tmux plugin manager)"

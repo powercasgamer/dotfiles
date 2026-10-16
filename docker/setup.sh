@@ -27,6 +27,8 @@ if [ "$(id -u)" -ne 0 ]; then
 fi
 
 DOCKER_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=../lib/backup.sh
+source "$DOCKER_DIR/../lib/backup.sh"
 TARGET_USER="${1:-${SUDO_USER:-}}"
 
 if command -v docker >/dev/null 2>&1 && docker compose version >/dev/null 2>&1; then
@@ -56,10 +58,7 @@ systemctl enable --now docker >/dev/null
 echo "==> Docker daemon hardening"
 mkdir -p /etc/docker
 if ! cmp -s "$DOCKER_DIR/daemon.json" /etc/docker/daemon.json 2>/dev/null; then
-  if [ -e /etc/docker/daemon.json ]; then
-    cp /etc/docker/daemon.json "/etc/docker/daemon.json.bak.$(date +%Y%m%d%H%M%S)"
-    echo "    backed up existing /etc/docker/daemon.json"
-  fi
+  backup_file /etc/docker/daemon.json cp
   cp "$DOCKER_DIR/daemon.json" /etc/docker/daemon.json
   systemctl restart docker
   echo "    daemon.json updated, docker restarted (live-restore kept containers up)"

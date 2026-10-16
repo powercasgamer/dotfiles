@@ -4,6 +4,12 @@
 set -euo pipefail
 
 DOTFILES_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=lib/backup.sh
+source "$DOTFILES_DIR/lib/backup.sh"
+# One backup folder for the whole run, shared with every setup script below
+# (see lib/backup.sh). Only created if something actually gets backed up.
+DOTFILES_BACKUP_DIR="$HOME/.dotfiles-backups/$(date +%Y%m%d-%H%M%S)"
+export DOTFILES_BACKUP_DIR
 ZSH_CUSTOM="${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}"
 
 echo "==> Checking dependencies"
@@ -37,10 +43,7 @@ clone_plugin https://github.com/zsh-users/zsh-syntax-highlighting "$ZSH_CUSTOM/p
 clone_plugin https://github.com/zsh-users/zsh-completions "$ZSH_CUSTOM/plugins/zsh-completions"
 
 echo "==> Linking ~/.zshrc"
-if [ -e "$HOME/.zshrc" ] && [ ! -L "$HOME/.zshrc" ]; then
-  mv "$HOME/.zshrc" "$HOME/.zshrc.bak.$(date +%Y%m%d%H%M%S)"
-  echo "    backed up existing ~/.zshrc"
-fi
+[ -L "$HOME/.zshrc" ] || backup_file "$HOME/.zshrc"
 ln -sf "$DOTFILES_DIR/zsh/zshrc" "$HOME/.zshrc"
 
 echo "==> Machine-local overrides / secrets"

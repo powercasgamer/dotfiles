@@ -15,6 +15,9 @@ dotfiles/
 ├── renovate.json      # Renovate config -- see "Dependency updates" below
 ├── install.sh        # installs Oh My Zsh + plugins, symlinks ~/.zshrc, runs git/setup.sh + tmux/setup.sh
 ├── new-user.sh        # creates a Linux user and bootstraps this whole setup for them
+├── .shellcheckrc      # lets shellcheck follow scripts' `source lib/...` lines
+├── lib/
+│   └── backup.sh               # sourced by setup scripts: backs up files into ~/.dotfiles-backups/
 ├── git/
 │   ├── setup.sh                # git identity/defaults, git-lfs, SSH commit+tag signing
 │   ├── gitignore_global        # applied to every repo via core.excludesfile
@@ -135,11 +138,23 @@ For a machine that's in use and set up its own way — its own `~/.zshrc`
 don't want to lose.
 
 `install.sh` never deletes anything, but it **does** replace or change
-some of what's there. Know what before running it:
+some of what's there. Files it replaces are moved first to one folder per
+run, laid out the same way as in your home directory:
+
+```
+~/.dotfiles-backups/<YYYYmmdd-HHMMSS>/.zshrc
+~/.dotfiles-backups/<YYYYmmdd-HHMMSS>/.tmux.conf
+```
+
+The folder is `chmod 700`. Root-only scripts (`apt/`, `docker/`) use the
+same scheme under root's home, e.g.
+`/root/.dotfiles-backups/<timestamp>/etc/docker/daemon.json`.
+
+What gets changed:
 
 | Existing thing | What `install.sh` does to it |
 |---|---|
-| `~/.zshrc`, `~/.tmux.conf`, `~/.nanorc` | Moved to `<file>.bak.<timestamp>`, replaced by a symlink into the repo. |
+| `~/.zshrc`, `~/.tmux.conf`, `~/.nanorc` | Moved to the backup folder, replaced by a symlink into the repo. |
 | `~/.oh-my-zsh` | Reused as-is — not reinstalled or updated. Custom themes/plugins in it are kept. |
 | `~/.gitconfig` | Identity kept. Overwrites `init.defaultBranch`, `pull.rebase` (→ `false`), `push.autoSetupRemote`, `core.editor` (→ `nano`), `rerere.enabled`, `color.ui`, **`core.excludesfile` / `core.attributesfile`** (→ this repo's files). If `~/.ssh/id_ed25519.pub` exists, turns on SSH commit/tag signing and **rewrites `~/.ssh/allowed_signers`**. |
 | `~/.ssh/config` | One `Include` line appended at the end; your `Host` blocks keep priority. |
@@ -165,7 +180,7 @@ cp -a ~/.zshrc ~/.tmux.conf ~/.nanorc ~/.gitconfig ~/.ssh/config \
 git config --global --list > ~/pre-dotfiles/gitconfig.list
 ```
 
-The `.bak` files cover the symlinked ones, but `~/.gitconfig` is edited in
+The backup folder covers the symlinked ones, but `~/.gitconfig` is edited in
 place and has no backup otherwise.
 
 ### 2. Get the repo and install
@@ -182,7 +197,8 @@ their old config until you reload them (step 4).
 ### 3. Port your old config across
 
 Don't edit `zsh/zshrc` for this machine's needs — it's shared across all
-machines. Go through `~/.zshrc.bak.*` and sort each part:
+machines. Go through the old one in `~/.dotfiles-backups/<timestamp>/.zshrc`
+and sort each part:
 
 - **Aliases, functions, exports, PATH entries specific to this box** →
   `~/.zshrc.local` (loaded last, so it overrides anything from the repo).
@@ -235,8 +251,8 @@ tmux show -sv extended-keys                        # on
 jq .remoteControlAtStartup ~/.claude/settings.json # true
 ```
 
-To back out: delete the symlinks, `mv` the `.bak.<timestamp>` files back
-into place, restore `~/.gitconfig` and `~/.ssh/allowed_signers` from
+To back out: delete the symlinks, copy the replaced files back with `cp -a
+~/.dotfiles-backups/<timestamp>/. ~/`, restore `~/.gitconfig` and `~/.ssh/allowed_signers` from
 `~/pre-dotfiles/`, and remove the `Include` line at the end of
 `~/.ssh/config`. Tools that got installed (nvm, uv, Claude Code…) live in
 your home directory and can be left or removed individually.

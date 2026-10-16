@@ -4,6 +4,8 @@
 set -euo pipefail
 
 NANO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=../lib/backup.sh
+source "$NANO_DIR/../lib/backup.sh"
 
 if ! command -v nano >/dev/null 2>&1; then
   echo "nano is not installed. Install it first, e.g.: sudo apt install -y nano"
@@ -11,10 +13,7 @@ if ! command -v nano >/dev/null 2>&1; then
 fi
 
 echo "==> Linking ~/.nanorc"
-if [ -e "$HOME/.nanorc" ] && [ ! -L "$HOME/.nanorc" ]; then
-  mv "$HOME/.nanorc" "$HOME/.nanorc.bak.$(date +%Y%m%d%H%M%S)"
-  echo "    backed up existing ~/.nanorc"
-fi
+[ -L "$HOME/.nanorc" ] || backup_file "$HOME/.nanorc"
 ln -sf "$NANO_DIR/nanorc" "$HOME/.nanorc"
 
 echo "==> Done"

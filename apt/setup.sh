@@ -22,15 +22,14 @@ if [ "$(id -u)" -ne 0 ]; then
 fi
 
 APT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=../lib/backup.sh
+source "$APT_DIR/../lib/backup.sh"
 DEST=/etc/apt/apt.conf.d/99dotfiles-no-translations
 
 if cmp -s "$APT_DIR/99dotfiles-no-translations" "$DEST" 2>/dev/null; then
   echo "==> apt speedup config already in place, skipping"
 else
-  if [ -e "$DEST" ]; then
-    cp "$DEST" "$DEST.bak.$(date +%Y%m%d%H%M%S)"
-    echo "    backed up existing $DEST"
-  fi
+  backup_file "$DEST" cp
   cp "$APT_DIR/99dotfiles-no-translations" "$DEST"
   echo "==> Wrote $DEST"
 fi
