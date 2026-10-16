@@ -156,3 +156,107 @@ gsize() {
     echo "GitHub-reported size:       $(_gsize_h $(( remote_kb * 1024 ))) (excludes LFS)"
   fi
 }
+
+# Move files to Git LFS. With no patterns, uses the ones already tracked in
+# .gitattributes (handy for --rewrite after `git lfs track` was set up late).
+#
+#   glfs '*.jar' '*.zip'        track + convert the current files in a new
+#                               commit; history keeps the old blobs
+#   glfs --rewrite ['*.jar']    rewrite every local branch/tag so those files
+#                               were always in LFS -- shrinks the repo, but
+#                               needs a force-push and every clone to re-clone
+#
+# --rewrite saves a `git bundle` of all refs first and never pushes; it
+# prints the push/cleanup commands to run once the result looks right.
+glfs() {
+  local rewrite=0
+  if [ "$1" = "--rewrite" ]; then rewrite=1; shift; fi
+  git rev-parse --git-dir >/dev/null 2>&1 || {
+    echo "Error: not a git repository." >&2
+    return 1
+  }
+  git lfs version >/dev/null 2>&1 || {
+    echo "Error: git-lfs not installed (git/setup.sh installs it)." >&2
+    return 1
+  }
+  local top
+  top=$(git rev-parse --show-toplevel) || return 1
+  cd "$top" || return 1
+
+  # Both modes rewrite tracked files in place -- don't mix in local edits.
+  if ! git diff --quiet || ! git diff --cached --quiet; then
+    echo "Error: uncommitted changes -- commit or stash them first." >&2
+    cd - >/dev/null; return 1
+  fi
+
+  local -a patterns
+  if [ $# -gt 0 ]; then
+    patterns=("$@")
+  else
+    patterns=(${(f)"$(git lfs track | awk '/^Listing excluded/ { exit } /^    / { print $1 }')"})
+  fi
+  if [ ${#patterns} -eq 0 ]; then
+    echo "Usage: glfs [--rewrite] <pattern>...   e.g. glfs '*.jar'" >&2
+    echo "No patterns given and none tracked yet. Largest file types in history:" >&2
+    git lfs migrate info --everything --top=10 --skip-fetch >&2
+    cd - >/dev/null; return 1
+  fi
+  local include="${(j:,:)patterns}"
+
+  if [ $rewrite -eq 0 ]; then
+    git lfs track "${patterns[@]}" || { cd - >/dev/null; return 1; }
+    git add .gitattributes
+    # re-run the (now LFS) clean filter over files already committed
+    git add --renormalize . || { cd - >/dev/null; return 1; }
+    if git diff --cached --quiet; then
+      echo "Nothing to convert -- already tracked."
+    else
+      git commit -m "Track ${(j:, :)patterns} with Git LFS" || { cd - >/dev/null; return 1; }
+      git show --stat --format='%h %s' HEAD
+      echo
+      echo "Old versions are still plain blobs in history; 'glfs --rewrite' removes them."
+    fi
+    cd - >/dev/null
+    return 0
+  fi
+
+  echo "==> Will rewrite every local branch and tag, moving to LFS: $include"
+  git lfs migrate info --everything --include="$include" --skip-fetch
+  # migrate --everything only rewrites local refs; a branch that exists only
+  # on the remote would be left with the old blobs (and keep them reachable)
+  local orphans
+  orphans=$(git for-each-ref --format='%(refname:short)' refs/remotes \
+    | grep -v '/HEAD$' | while read -r r; do
+        git show-ref --verify --quiet "refs/heads/${r#*/}" || echo "  $r"
+      done)
+  if [ -n "$orphans" ]; then
+    echo
+    echo "Remote branches with no local branch -- these will NOT be rewritten:"
+    echo "$orphans"
+    echo "(git switch <name> for each first, if they should be)"
+  fi
+  echo
+  local answer
+  read -r "answer?Rewrite history? [y/N] "
+  if [[ "$answer" != [yY]* ]]; then
+    cd - >/dev/null; return 1
+  fi
+
+  local backup="$HOME/.dotfiles-backups/git-lfs-migrate/${top:t}-$(date +%Y%m%d-%H%M%S).bundle"
+  mkdir -p "${backup:h}" && chmod 700 "${backup:h:h}"
+  git bundle create "$backup" --all || { cd - >/dev/null; return 1; }
+  echo "==> Backup: $backup  (restore: git clone $backup)"
+
+  git lfs migrate import --everything --include="$include" || {
+    echo "Error: migrate failed -- refs unchanged or restore from $backup" >&2
+    cd - >/dev/null; return 1
+  }
+
+  echo
+  echo "==> Done locally. Check it (git log, gsize), then:"
+  echo "  git push --force-with-lease --all && git push --force-with-lease --tags"
+  echo "  git reflog expire --expire=now --all && git gc --prune=now   # reclaim local space"
+  echo "Other clones must re-clone (or reset hard onto the rewritten branches)."
+  echo "Until the push, origin/* still holds the old blobs, so gsize won't shrink yet."
+  cd - >/dev/null
+}
