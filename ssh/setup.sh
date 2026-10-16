@@ -37,4 +37,31 @@ else
 fi
 commit_snapshot "$HOME/.ssh/config"
 
+# ssh_config sets `IdentitiesOnly yes` for every host, so ssh only offers
+# keys named by an IdentityFile line or with a default name (id_ed25519,
+# id_rsa, ...) -- even if the agent holds others. A machine that used to
+# authenticate with, say, ~/.ssh/work via the agent stops working until
+# that key gets an IdentityFile line. Point those out.
+echo "==> Keys ssh will no longer offer on its own"
+found=0
+for key in "$HOME"/.ssh/*; do
+  [ -f "$key" ] || continue
+  head -n1 "$key" 2>/dev/null | grep -q -- '-----BEGIN .*PRIVATE KEY-----' || continue
+  name="$(basename "$key")"
+  case "$name" in
+    id_rsa|id_ecdsa|id_ecdsa_sk|id_ed25519|id_ed25519_sk|id_dsa|id_xmss) continue ;;
+  esac
+  grep -qiE "^[[:space:]]*IdentityFile[[:space:]]+.*/$name\$" "$HOME/.ssh/config" && continue
+  found=1
+  echo "    ~/.ssh/$name has a non-default name and no IdentityFile line."
+done
+if [ "$found" -eq 1 ]; then
+  echo "    If you use any of these, add a block ABOVE the Include line in"
+  echo "    ~/.ssh/config, e.g. for GitHub:"
+  echo "      Host github.com"
+  echo "        IdentityFile ~/.ssh/<name>"
+else
+  echo "    none"
+fi
+
 echo "==> Done"

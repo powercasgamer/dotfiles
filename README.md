@@ -196,7 +196,7 @@ What gets changed:
 | `~/.zshrc`, `~/.tmux.conf`, `~/.nanorc` | Moved to the backup folder, replaced by a symlink into the repo. |
 | `~/.oh-my-zsh` | Reused as-is — not reinstalled or updated. Custom themes/plugins in it are kept. |
 | `~/.gitconfig` | Identity kept. Overwrites `init.defaultBranch`, `pull.rebase` (→ `false`), `push.autoSetupRemote`, `core.editor` (→ `nano`), `rerere.enabled`, `color.ui`, **`core.excludesfile` / `core.attributesfile`** (→ this repo's files). If `~/.ssh/id_ed25519.pub` exists, turns on SSH commit/tag signing and **rewrites `~/.ssh/allowed_signers`**. |
-| `~/.ssh/config` | One `Include` line appended at the end; your `Host` blocks keep priority. |
+| `~/.ssh/config` | One `Include` line appended at the end; your `Host` blocks keep priority. **But** the included defaults set `IdentitiesOnly yes`, so ssh stops offering agent-loaded keys with non-default names (anything but `id_ed25519`, `id_rsa`, …) — e.g. `git pull` fails with `Permission denied (publickey)`. `ssh/setup.sh` lists such keys; give each one an `IdentityFile` line in a `Host` block above the `Include`. |
 | nvm, SDKMAN, bun, uv, Claude Code… | Skipped if already installed. |
 | `~/.claude/settings.json` | Only `remoteControlAtStartup` set to `true`. |
 | `~/.bashrc`, login shell | Untouched. |
