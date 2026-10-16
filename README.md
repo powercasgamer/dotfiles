@@ -292,6 +292,18 @@ background (including through an SSH disconnect), and `claude-tmux` from any
 terminal picks the same session back up. Other tmux shortcuts: `tm` (tmux),
 `tma <name>` (attach), `tml` (list sessions), `tmk <name>` (kill a session).
 
+`conf.d/options.conf` sets a few options so Claude Code (and other modern
+TUIs) behave inside tmux the way they do in a bare terminal:
+
+- `extended-keys` + `extkeys` — Shift+Enter reaches Claude as a newline
+  instead of collapsing to plain Enter (which would submit the prompt).
+  The outer terminal has to support extended keys too.
+- `set-clipboard on` — OSC 52 copies from inside a pane (Claude's `/copy`,
+  yanks over SSH) land in your local clipboard.
+- `hyperlinks` — file paths and URLs Claude prints are clickable.
+- `allow-passthrough on` — notification escape sequences reach the outer
+  terminal.
+
 ## SSH setup (`ssh/`)
 
 Client and server hardening are split into two separate scripts with very
