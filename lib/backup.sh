@@ -52,3 +52,33 @@ backup_file() {
   fi
   echo "    backed up $src -> $dest"
 }
+
+# snapshot_file <path>, then later commit_snapshot <path>
+#   For files edited in place on every run (~/.gitconfig, ~/.ssh/config):
+#   snapshot before editing, and commit_snapshot keeps the pre-edit copy in
+#   the backup folder only if the file actually changed -- so re-runs that
+#   change nothing don't pile up identical backups.
+declare -gA _DOTFILES_SNAPSHOTS=()
+
+snapshot_file() {
+  local tmp
+  [ -e "$1" ] || return 0
+  tmp="$(mktemp)"
+  cp -pL "$1" "$tmp"
+  _DOTFILES_SNAPSHOTS["$1"]="$tmp"
+}
+
+commit_snapshot() {
+  local src="$1" tmp dest
+  tmp="${_DOTFILES_SNAPSHOTS["$src"]:-}"
+  [ -n "$tmp" ] || return 0
+  unset '_DOTFILES_SNAPSHOTS[$src]'
+  if cmp -s "$tmp" "$src"; then
+    rm -f "$tmp"
+    return 0
+  fi
+  _backup_dest "$src"
+  dest="$_BACKUP_DEST"
+  mv "$tmp" "$dest"
+  echo "    backed up previous $src -> $dest"
+}

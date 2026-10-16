@@ -8,6 +8,8 @@
 set -euo pipefail
 
 SSH_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=../lib/backup.sh
+source "$SSH_DIR/../lib/backup.sh"
 INCLUDE_LINE="Include $SSH_DIR/ssh_config"
 
 echo "==> ~/.ssh permissions"
@@ -17,6 +19,7 @@ mkdir -p "$HOME/.ssh/sockets"
 chmod 700 "$HOME/.ssh/sockets"
 
 echo "==> ~/.ssh/config"
+snapshot_file "$HOME/.ssh/config"
 touch "$HOME/.ssh/config"
 chmod 600 "$HOME/.ssh/config"
 if grep -qxF "$INCLUDE_LINE" "$HOME/.ssh/config" 2>/dev/null; then
@@ -32,5 +35,6 @@ else
   } >> "$HOME/.ssh/config"
   echo "    added include line to the end of ~/.ssh/config"
 fi
+commit_snapshot "$HOME/.ssh/config"
 
 echo "==> Done"

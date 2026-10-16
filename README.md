@@ -138,17 +138,20 @@ For a machine that's in use and set up its own way — its own `~/.zshrc`
 don't want to lose.
 
 `install.sh` never deletes anything, but it **does** replace or change
-some of what's there. Files it replaces are moved first to one folder per
-run, laid out the same way as in your home directory:
+some of what's there. Everything it replaces or edits is saved first to
+one folder per run, laid out the same way as in your home directory:
 
 ```
 ~/.dotfiles-backups/<YYYYmmdd-HHMMSS>/.zshrc
-~/.dotfiles-backups/<YYYYmmdd-HHMMSS>/.tmux.conf
+~/.dotfiles-backups/<YYYYmmdd-HHMMSS>/.gitconfig
+~/.dotfiles-backups/<YYYYmmdd-HHMMSS>/.ssh/config
 ```
 
-The folder is `chmod 700`. Root-only scripts (`apt/`, `docker/`) use the
-same scheme under root's home, e.g.
-`/root/.dotfiles-backups/<timestamp>/etc/docker/daemon.json`.
+Files edited in place (`~/.gitconfig`, `~/.ssh/config`,
+`~/.ssh/allowed_signers`) are only saved when a run actually changes them,
+so re-running doesn't pile up identical copies. The folder is `chmod 700`.
+Root-only scripts (`apt/`, `docker/`) use the same scheme under root's home,
+e.g. `/root/.dotfiles-backups/<timestamp>/etc/docker/daemon.json`.
 
 What gets changed:
 
@@ -171,19 +174,7 @@ sudo -iu dotfiles-test          # look around, then: sudo userdel -r dotfiles-te
 
 Same setup, without touching your own account.
 
-### 1. Snapshot what's there
-
-```bash
-mkdir -p ~/pre-dotfiles
-cp -a ~/.zshrc ~/.tmux.conf ~/.nanorc ~/.gitconfig ~/.ssh/config \
-      ~/.ssh/allowed_signers ~/pre-dotfiles/ 2>/dev/null
-git config --global --list > ~/pre-dotfiles/gitconfig.list
-```
-
-The backup folder covers the symlinked ones, but `~/.gitconfig` is edited in
-place and has no backup otherwise.
-
-### 2. Get the repo and install
+### 1. Get the repo and install
 
 ```bash
 git clone <this-repo-url> ~/dotfiles
@@ -192,9 +183,9 @@ sudo ~/dotfiles/packages/setup.sh       # base apt packages, only what's missing
 ```
 
 Nothing running is touched yet — open shells and the tmux server keep
-their old config until you reload them (step 4).
+their old config until you reload them (step 3).
 
-### 3. Port your old config across
+### 2. Port your old config across
 
 Don't edit `zsh/zshrc` for this machine's needs — it's shared across all
 machines. Go through the old one in `~/.dotfiles-backups/<timestamp>/.zshrc`
@@ -223,12 +214,12 @@ Gotchas coming from an older or different setup:
   gone; see `zsh/aliases/git/aliases.zsh` for what's here instead.
 - **Old `~/.tmux.conf`**: different prefix or bindings you relied on go in
   `tmux/conf.d/` (repo-wide) — there's no tmux equivalent of `.zshrc.local`.
-- **git**: compare `git config --global --list` with
-  `~/pre-dotfiles/gitconfig.list` and put back anything you need, e.g.
+- **git**: `git diff --no-index ~/.dotfiles-backups/<timestamp>/.gitconfig
+  ~/.gitconfig` shows what changed; put back anything you need, e.g.
   your own global ignore or `pull.rebase true`. If signing got switched on
   and you don't want it: `git config --global commit.gpgsign false`.
 
-### 4. Switch over without killing anything
+### 3. Switch over without killing anything
 
 | What | How |
 |---|---|
@@ -243,7 +234,7 @@ restarts. That's harmless, so do the restart (`tmux kill-server`, then
 `claude-tmux` / `tmux` again) whenever nothing important is running — not
 before.
 
-### 5. Check, and how to back out
+### 4. Check, and how to back out
 
 ```bash
 readlink ~/.zshrc ~/.tmux.conf                     # both point into ~/dotfiles
@@ -251,10 +242,10 @@ tmux show -sv extended-keys                        # on
 jq .remoteControlAtStartup ~/.claude/settings.json # true
 ```
 
-To back out: delete the symlinks, copy the replaced files back with `cp -a
-~/.dotfiles-backups/<timestamp>/. ~/`, restore `~/.gitconfig` and `~/.ssh/allowed_signers` from
-`~/pre-dotfiles/`, and remove the `Include` line at the end of
-`~/.ssh/config`. Tools that got installed (nvm, uv, Claude Code…) live in
+To back out: delete the symlinks, then copy everything in the backup
+folder back over your home directory — `cp -a
+~/.dotfiles-backups/<timestamp>/. ~/` — which restores the replaced files
+and the pre-edit `~/.gitconfig`, `~/.ssh/config` and `allowed_signers`. Tools that got installed (nvm, uv, Claude Code…) live in
 your home directory and can be left or removed individually.
 
 ## Updating a machine already using these dotfiles
@@ -264,7 +255,7 @@ dotfiles-update     # = cd ~/dotfiles && git pull --ff-only && ./install.sh
 exec zsh
 ```
 
-Then reload what changed, same as step 4 above: `<prefix> r` for tmux,
+Then reload what changed, same as step 3 above: `<prefix> r` for tmux,
 `<prefix> I` if `conf.d/plugins.conf` gained a plugin, a new Claude session
 for Claude settings. If a pull added a new base package, also run
 `sudo ~/dotfiles/packages/setup.sh`.

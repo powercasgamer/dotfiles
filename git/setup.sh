@@ -12,6 +12,8 @@
 set -euo pipefail
 
 GIT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=../lib/backup.sh
+source "$GIT_DIR/../lib/backup.sh"
 LFS_VERSION="3.7.1"
 GH_VERSION="2.97.0"
 SIGNING_KEY="${SIGNING_KEY:-$HOME/.ssh/id_ed25519.pub}"
@@ -20,6 +22,11 @@ SIGNING_KEY="${SIGNING_KEY:-$HOME/.ssh/id_ed25519.pub}"
 # reliable even when this script is run directly (bash git/setup.sh) in a
 # shell that hasn't sourced .bashrc/.zshrc yet, so ~/.local/bin isn't on PATH.
 export PATH="$HOME/.local/bin:$PATH"
+
+# Edited in place below, so there's nothing to back up by moving: keep a
+# pre-run copy, saved to the backup folder at the end only if it changed.
+snapshot_file "$HOME/.gitconfig"
+snapshot_file "$HOME/.ssh/allowed_signers"
 
 echo "==> Git identity & defaults"
 GIT_NAME="${GIT_NAME:-$(git config --global user.name || true)}"
@@ -121,5 +128,8 @@ else
   echo "    or securely copy an existing keypair from another machine (e.g. via scp),"
   echo "    then re-run this script. Never commit a private key to this repo."
 fi
+
+commit_snapshot "$HOME/.gitconfig"
+commit_snapshot "$HOME/.ssh/allowed_signers"
 
 echo "==> Done"
