@@ -485,6 +485,12 @@ a backstop, truncates any appended lines back off afterward — same
 approach as `bun/setup.sh`. `~/.local/bin` is already on `PATH` via
 `zsh/exports/core/exports.zsh`.
 
+It also sets `"remoteControlAtStartup": true` in `~/.claude/settings.json`
+on every run, so every session can be picked up from claude.ai or the
+mobile app. Only that one key is touched (merged in with `jq`); the rest of
+`settings.json` is machine-specific and isn't tracked here. If `jq` is
+missing the step is skipped with a note.
+
 ## WakaTime setup (`wakatime/setup.sh`)
 
 Unprivileged, run automatically by `install.sh` (skipped with a note if
