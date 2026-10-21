@@ -81,6 +81,22 @@ TARGET_USER="${TARGET_USER:-${SUDO_USER:-$(id -un)}}"
 IS_ROOT=0
 [[ "$(id -u)" -eq 0 ]] && IS_ROOT=1
 
+# One real run at a time -- e.g. a `sudo ./cleanup.sh` by hand while the
+# weekly timer's run is still going. Held until the script exits; dry runs
+# change nothing, so they don't take it.
+if [[ "$DRY_RUN" -eq 0 ]] && command -v flock >/dev/null 2>&1; then
+  if [[ "$IS_ROOT" -eq 1 ]]; then
+    LOCK_FILE=/run/lock/dotfiles-cleanup.lock
+  else
+    LOCK_FILE="${XDG_RUNTIME_DIR:-/tmp}/dotfiles-cleanup-$(id -u).lock"
+  fi
+  exec 9>>"$LOCK_FILE"
+  if ! flock -n 9; then
+    echo "Another cleanup run is already in progress (lock: $LOCK_FILE)." >&2
+    exit 1
+  fi
+fi
+
 if [[ "$DRY_RUN" -eq 0 && "$ASSUME_YES" -eq 0 && -t 0 ]]; then
   PROMPT="This will prune Docker resources, vacuum journald/apt/flatpak, delete old rotated logs, and empty trash/thumbnails older than ${TRASH_AGE_DAYS}d for '$TARGET_USER'. Continue?"
   if command -v gum >/dev/null 2>&1; then
