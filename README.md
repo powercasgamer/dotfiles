@@ -769,11 +769,11 @@ dotfiles-java-slim:25`), or bypass it entirely with, e.g.,
 
 Reclaims disk space on a schedule: old Docker containers/images/build
 cache/oversized container logs, the systemd journal, apt's package cache,
-stale rotated logs in `/var/log` plus a configurable list of other service
-log directories (`service-logs.txt` — redis, mongodb, nats, influxdb,
-questdb, clickhouse, mysql/postgres, and more; anything not actually
-installed is silently skipped), and the trash + thumbnail cache of a real
-user. Everything is age-gated and only ever touches stopped/unused/rotated
+unused Flatpak runtimes, stale rotated logs in `/var/log` plus a
+configurable list of other service log directories (`service-logs.txt` —
+redis, mongodb, nats, influxdb, questdb, clickhouse, mysql/postgres, and
+more; anything not actually installed is silently skipped), and the
+trash + thumbnail cache of a real user. Everything is age-gated and only ever touches stopped/unused/rotated
 things — never running containers, in-use images, or active log files
 (the one opt-in exception being `LOG_TRUNCATE_UNROTATED`, off by default).
 
@@ -805,9 +805,11 @@ other argument is rejected rather than ignored:
   container's JSON log file (whatever image it's running — no name
   matching involved) past 500MB, which matters for long-running containers
   that predate `docker/daemon.json`'s log rotation cap.
-- **journald, apt, `/var/log` + `service-logs.txt`** (root only — skipped
-  with a note otherwise): vacuums the journal to 14 days, runs
-  `apt-get autoremove` + `autoclean`, and deletes rotated/compressed logs
+- **journald, apt, Flatpak, `/var/log` + `service-logs.txt`** (root only —
+  skipped with a note otherwise): vacuums the journal to 14 days, runs
+  `apt-get autoremove` + `autoclean` + `clean`, uninstalls unused
+  system Flatpak runtimes/extensions and runs `flatpak repair --system`,
+  and deletes rotated/compressed logs
   (`*.gz`, `*.xz`, `*.log.N`, `*.old`, dateext-style `*.log-YYYYMMDD`)
   older than 60 days from `/var/log` and every existing path in
   `cleanup/service-logs.txt`. That file is a plain `name path` list (same
