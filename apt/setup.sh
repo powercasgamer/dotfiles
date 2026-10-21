@@ -26,6 +26,8 @@ if [ "$(id -u)" -ne 0 ]; then
 fi
 
 APT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=../lib/backup.sh
+source "$APT_DIR/../lib/backup.sh"
 
 install_conf() {
   local name="$1" dest="/etc/apt/apt.conf.d/$1"
@@ -33,10 +35,7 @@ install_conf() {
     echo "==> $name already in place, skipping"
     return
   fi
-  if [ -e "$dest" ]; then
-    cp "$dest" "$dest.bak.$(date +%Y%m%d%H%M%S)"
-    echo "    backed up existing $dest"
-  fi
+  backup_file "$dest" cp
   cp "$APT_DIR/$name" "$dest"
   echo "==> Wrote $dest"
 }

@@ -4,12 +4,34 @@
 set -euo pipefail
 
 DOTFILES_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=lib/backup.sh
+source "$DOTFILES_DIR/lib/backup.sh"
+# One backup folder for the whole run, shared with every setup script below
+# (see lib/backup.sh). Only created if something actually gets backed up.
+DOTFILES_BACKUP_DIR="$HOME/.dotfiles-backups/$(date +%Y%m%d-%H%M%S)"
+export DOTFILES_BACKUP_DIR
 ZSH_CUSTOM="${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}"
+
+# Running as root (a server or container logged in as root, no sudo), the
+# root-only steps below can just run, and the hints for opt-in ones drop
+# the `sudo` prefix -- containers often don't have sudo at all.
+if [ "$(id -u)" -eq 0 ]; then
+  SUDO=""
+  NOT_AUTO="opt-in, so not run automatically"
+else
+  SUDO="sudo "
+  NOT_AUTO="needs root, so not run automatically here"
+fi
+
+if [ -z "$SUDO" ] && command -v apt-get >/dev/null 2>&1; then
+  echo "==> Base packages (running as root, so installing them directly)"
+  "$DOTFILES_DIR/packages/setup.sh"
+fi
 
 echo "==> Checking dependencies"
 for cmd in zsh git curl; do
   if ! command -v "$cmd" >/dev/null 2>&1; then
-    echo "Missing '$cmd'. Install it first, e.g.: sudo apt install -y zsh git curl"
+    echo "Missing '$cmd'. Install the base packages first: ${SUDO}~/dotfiles/packages/setup.sh"
     exit 1
   fi
 done
@@ -37,11 +59,12 @@ clone_plugin https://github.com/zsh-users/zsh-syntax-highlighting "$ZSH_CUSTOM/p
 clone_plugin https://github.com/zsh-users/zsh-completions "$ZSH_CUSTOM/plugins/zsh-completions"
 
 echo "==> Linking ~/.zshrc"
-if [ -e "$HOME/.zshrc" ] && [ ! -L "$HOME/.zshrc" ]; then
-  mv "$HOME/.zshrc" "$HOME/.zshrc.bak.$(date +%Y%m%d%H%M%S)"
-  echo "    backed up existing ~/.zshrc"
-fi
+[ -L "$HOME/.zshrc" ] || backup_file "$HOME/.zshrc"
 ln -sf "$DOTFILES_DIR/zsh/zshrc" "$HOME/.zshrc"
+
+echo "==> Linking ~/.zshenv"
+[ -L "$HOME/.zshenv" ] || backup_file "$HOME/.zshenv"
+ln -sf "$DOTFILES_DIR/zsh/zshenv" "$HOME/.zshenv"
 
 echo "==> Machine-local overrides / secrets"
 if [ ! -e "$HOME/.zshrc.local" ]; then
@@ -66,7 +89,7 @@ if command -v tmux >/dev/null 2>&1; then
   "$DOTFILES_DIR/tmux/setup.sh"
 else
   echo "    tmux not installed, skipping. Install it and re-run this script, or"
-  echo "    just run: sudo apt install -y tmux && ~/dotfiles/tmux/setup.sh"
+  echo "    just run: ${SUDO}apt install -y tmux && ~/dotfiles/tmux/setup.sh"
 fi
 
 echo "==> nano config"
@@ -74,7 +97,7 @@ if command -v nano >/dev/null 2>&1; then
   "$DOTFILES_DIR/nano/setup.sh"
 else
   echo "    nano not installed, skipping. Install it and re-run this script, or"
-  echo "    just run: sudo apt install -y nano && ~/dotfiles/nano/setup.sh"
+  echo "    just run: ${SUDO}apt install -y nano && ~/dotfiles/nano/setup.sh"
 fi
 
 echo "==> SSH client config"
@@ -86,8 +109,8 @@ echo "==> SDKMAN"
 if command -v zip >/dev/null 2>&1 && command -v unzip >/dev/null 2>&1; then
   "$DOTFILES_DIR/sdkman/setup.sh"
 else
-  echo "    zip/unzip not installed (needs root, so not run automatically here):"
-  echo "    sudo apt install -y zip unzip && ~/dotfiles/sdkman/setup.sh"
+  echo "    zip/unzip not installed ($NOT_AUTO):"
+  echo "    ${SUDO}apt install -y zip unzip && ~/dotfiles/sdkman/setup.sh"
 fi
 
 echo "==> nvm"
@@ -97,8 +120,8 @@ echo "==> bun"
 if command -v unzip >/dev/null 2>&1; then
   "$DOTFILES_DIR/bun/setup.sh"
 else
-  echo "    unzip not installed (needs root, so not run automatically here):"
-  echo "    sudo apt install -y unzip && ~/dotfiles/bun/setup.sh"
+  echo "    unzip not installed ($NOT_AUTO):"
+  echo "    ${SUDO}apt install -y unzip && ~/dotfiles/bun/setup.sh"
 fi
 
 echo "==> pnpm"
@@ -108,24 +131,24 @@ echo "==> Docker"
 if command -v docker >/dev/null 2>&1; then
   echo "    already installed"
 else
-  echo "    not installed (needs root, so not run automatically here):"
-  echo "    sudo ~/dotfiles/docker/setup.sh"
+  echo "    not installed ($NOT_AUTO):"
+  echo "    ${SUDO}~/dotfiles/docker/setup.sh"
 fi
 
 echo "==> Storage cleanup"
-echo "    not installed (needs root, so not run automatically here):"
-echo "    sudo ~/dotfiles/cleanup/setup.sh"
+echo "    not installed ($NOT_AUTO):"
+echo "    ${SUDO}~/dotfiles/cleanup/setup.sh"
 
 echo "==> micro (optional editor)"
-echo "    not installed (needs root, so not run automatically here):"
-echo "    sudo ~/dotfiles/micro/setup.sh"
+echo "    not installed ($NOT_AUTO):"
+echo "    ${SUDO}~/dotfiles/micro/setup.sh"
 
 echo "==> Flatpak (optional)"
 if command -v flatpak >/dev/null 2>&1; then
   echo "    already installed"
 else
-  echo "    not installed (needs root, so not run automatically here):"
-  echo "    sudo ~/dotfiles/flatpak/setup.sh"
+  echo "    not installed ($NOT_AUTO):"
+  echo "    ${SUDO}~/dotfiles/flatpak/setup.sh"
 fi
 
 echo "==> apt speedup (optional, skips translation + AppStream index files on apt update)"
@@ -135,16 +158,16 @@ if [ -e /etc/apt/apt.conf.d/99dotfiles-no-translations ] &&
      command -v plasma-discover >/dev/null 2>&1; }; then
   echo "    already configured"
 else
-  echo "    not configured (needs root, so not run automatically here):"
-  echo "    sudo ~/dotfiles/apt/setup.sh"
+  echo "    not configured ($NOT_AUTO):"
+  echo "    ${SUDO}~/dotfiles/apt/setup.sh"
 fi
 
 echo "==> Python 3"
 if command -v python3 >/dev/null 2>&1; then
   echo "    already installed"
 else
-  echo "    python3 not installed (needs root, so not run automatically here):"
-  echo "    sudo ~/dotfiles/python/setup.sh"
+  echo "    python3 not installed ($NOT_AUTO):"
+  echo "    ${SUDO}~/dotfiles/python/setup.sh"
 fi
 
 echo "==> uv"
@@ -157,8 +180,8 @@ echo "==> WakaTime"
 if command -v unzip >/dev/null 2>&1; then
   "$DOTFILES_DIR/wakatime/setup.sh"
 else
-  echo "    unzip not installed (needs root, so not run automatically here):"
-  echo "    sudo apt install -y unzip && ~/dotfiles/wakatime/setup.sh"
+  echo "    unzip not installed ($NOT_AUTO):"
+  echo "    ${SUDO}apt install -y unzip && ~/dotfiles/wakatime/setup.sh"
 fi
 
 echo "==> Done. Start a new zsh session with: exec zsh"

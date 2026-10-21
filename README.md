@@ -15,6 +15,9 @@ dotfiles/
 ├── renovate.json      # Renovate config -- see "Dependency updates" below
 ├── install.sh        # installs Oh My Zsh + plugins, symlinks ~/.zshrc, runs git/setup.sh + tmux/setup.sh
 ├── new-user.sh        # creates a Linux user and bootstraps this whole setup for them
+├── .shellcheckrc      # lets shellcheck follow scripts' `source lib/...` lines
+├── lib/
+│   └── backup.sh               # sourced by setup scripts: backs up files into ~/.dotfiles-backups/
 ├── git/
 │   ├── setup.sh                # git identity/defaults, git-lfs, SSH commit+tag signing
 │   ├── gitignore_global        # applied to every repo via core.excludesfile
@@ -60,6 +63,8 @@ dotfiles/
 │   └── setup.sh                 # installs a weekly systemd timer for it (opt-in, NOT run by install.sh)
 ├── python/
 │   └── setup.sh                  # installs python3 + python3-dev via apt (opt-in, NOT run by install.sh)
+├── packages/
+│   └── setup.sh                  # apt: zsh git curl tmux nano zip unzip jq (run first, as root; NOT run by install.sh)
 └── zsh/
     ├── zshrc                       # main config (becomes ~/.zshrc via symlink)
     ├── zshrc.local.example         # template -> ~/.zshrc.local (host tweaks, not tracked)
@@ -84,7 +89,7 @@ dotfiles/
         ├── core/functions.zsh      # mkcd, bak, psgrep, bsha256/bsha512, rsync-copy, dl, paste
         ├── dotfiles/functions.zsh  # dotfiles-update (git pull + re-run install.sh)
         ├── gradle/functions.zsh    # killgradlehard, killgradle (force/graceful daemon kill)
-        ├── git/functions.zsh      # gsfp, gcpp, gca, gsca, gpush
+        ├── git/functions.zsh      # gsfp, gcpp, gca, gsca, gpush, gsize, glfs
         └── system/functions.zsh   # killgateway
 ```
 
@@ -97,8 +102,9 @@ category is just making a new folder and dropping a `.zsh` file in it, e.g.
 ## Set up on a new machine
 
 ```bash
-sudo apt update && sudo apt install -y zsh git curl tmux   # if not already present
+sudo apt update && sudo apt install -y git   # just enough to clone
 git clone <this-repo-url> ~/dotfiles    # or scp/rsync the folder over
+sudo ~/dotfiles/packages/setup.sh       # zsh, curl, tmux, nano, zip/unzip, jq
 ~/dotfiles/install.sh
 exec zsh
 ```
@@ -123,6 +129,183 @@ Docker is also opt-in and not part of `install.sh` (it needs root for a
 system package + daemon, unlike everything else here) — see the Docker
 section below. Same for the storage cleanup timer and the Python install —
 see the Cleanup and Python sections below.
+
+### As root
+
+Everything works when logged in as root directly (a VPS or container with
+no regular user, and often no `sudo`). Drop the `sudo`s:
+
+```bash
+apt update && apt install -y git
+git clone <this-repo-url> ~/dotfiles    # i.e. /root/dotfiles
+~/dotfiles/install.sh                   # installs the base packages itself
+exec zsh
+```
+
+What changes when you're root:
+
+- **`install.sh` installs the base packages itself** (runs
+  `packages/setup.sh` first), since it has the rights to. The other
+  root-only scripts — Docker, cleanup timer, micro, Flatpak, apt speedup,
+  Python, SSH hardening, firewall — stay opt-in; their hints are just
+  printed without `sudo`.
+- **Root-only scripts that act on behalf of a user** (`micro/`, `cleanup/`,
+  `docker/setup.sh`) default to the user who ran `sudo`, or to root when
+  there was no `sudo`. So `micro/setup.sh` links root's settings, and
+  `docker/setup.sh` skips the docker group (root doesn't need it). Pass a
+  username to target someone else.
+- **zsh aliases** `update`, `install`, `autoremove` and `ports` drop their
+  `sudo` prefix.
+- Everything lands in `/root` as usual: `/root/.zshrc`,
+  `/root/.dotfiles-backups/`, `/root/.local/bin/claude`, and so on.
+
+Running `install.sh` **through** `sudo` from a regular account
+(`sudo ~/dotfiles/install.sh`) isn't the same thing and isn't supported:
+it links root's `~/.zshrc` and `~/.tmux.conf` into that user's copy of the
+repo, which they can edit — a way into root. Run it as the user it's for,
+and `sudo` only the scripts that need it. To set up root as well, give
+root its own clone (`/root/dotfiles`) and run it as root.
+
+## Adopting on a machine that already has its own config
+
+For a machine that's in use and set up its own way — its own `~/.zshrc`
+(maybe an older Oh My Zsh, or another framework), `~/.tmux.conf`,
+`~/.gitconfig` — with tmux sessions and Claude Code running that you
+don't want to lose.
+
+`install.sh` never deletes anything, but it **does** replace or change
+some of what's there. Everything it replaces or edits is saved first to
+one folder per run, laid out the same way as in your home directory:
+
+```
+~/.dotfiles-backups/<YYYYmmdd-HHMMSS>/.zshrc
+~/.dotfiles-backups/<YYYYmmdd-HHMMSS>/.gitconfig
+~/.dotfiles-backups/<YYYYmmdd-HHMMSS>/.ssh/config
+```
+
+Files edited in place (`~/.gitconfig`, `~/.ssh/config`,
+`~/.ssh/allowed_signers`) are only saved when a run actually changes them,
+so re-running doesn't pile up identical copies. The folder is `chmod 700`.
+Root-only scripts (`apt/`, `docker/`) use the same scheme under root's home,
+e.g. `/root/.dotfiles-backups/<timestamp>/etc/docker/daemon.json`.
+
+What gets changed:
+
+| Existing thing | What `install.sh` does to it |
+|---|---|
+| `~/.zshrc`, `~/.tmux.conf`, `~/.nanorc` | Moved to the backup folder, replaced by a symlink into the repo. |
+| `~/.oh-my-zsh` | Reused as-is — not reinstalled or updated. Custom themes/plugins in it are kept. |
+| `~/.gitconfig` | Identity kept. Overwrites `init.defaultBranch`, `pull.rebase` (→ `false`), `push.autoSetupRemote`, `core.editor` (→ `nano`), `rerere.enabled`, `color.ui`, **`core.excludesfile` / `core.attributesfile`** (→ this repo's files). If `~/.ssh/id_ed25519.pub` exists, turns on SSH commit/tag signing and **rewrites `~/.ssh/allowed_signers`**. |
+| `~/.ssh/config` | One `Include` line appended at the end; your `Host` blocks keep priority. **But** the included defaults set `IdentitiesOnly yes`, so ssh stops offering agent-loaded keys with non-default names (anything but `id_ed25519`, `id_rsa`, …) — e.g. `git pull` fails with `Permission denied (publickey)`. `ssh/setup.sh` lists such keys; give each one an `IdentityFile` line in a `Host` block above the `Include`. |
+| nvm, SDKMAN, bun, uv, Claude Code… | Skipped if already installed. |
+| `~/.claude/settings.json` | Only `remoteControlAtStartup` set to `true`. |
+| `~/.bashrc`, login shell | Untouched. |
+
+### 0. Optional: try it on a throwaway user first
+
+```bash
+sudo ~/dotfiles/new-user.sh dotfiles-test --no-password
+sudo -iu dotfiles-test          # look around, then: sudo userdel -r dotfiles-test
+```
+
+Same setup, without touching your own account.
+
+### 1. Get the repo and install
+
+```bash
+git clone <this-repo-url> ~/dotfiles
+sudo ~/dotfiles/packages/setup.sh       # base apt packages, only what's missing
+~/dotfiles/install.sh
+```
+
+Nothing running is touched yet — open shells and the tmux server keep
+their old config until you reload them (step 3).
+
+### 2. Port your old config across
+
+Don't edit `zsh/zshrc` for this machine's needs — it's shared across all
+machines. Go through the old one in `~/.dotfiles-backups/<timestamp>/.zshrc`
+and sort each part:
+
+- **Aliases, functions, exports, PATH entries specific to this box** →
+  `~/.zshrc.local` (loaded last, so it overrides anything from the repo).
+- **Tokens, API keys, passwords** → `~/.zshrc.secrets` (`chmod 600`).
+- **Things every machine should have** → a new `.zsh` file under
+  `zsh/aliases/`, `zsh/exports/` or `zsh/functions/`, committed to the repo.
+- **Version-manager init lines** (nvm, SDKMAN, bun, pyenv-style `eval`s,
+  `export PATH=$HOME/.local/bin...`) → usually drop them; the repo has its
+  own under `zsh/exports/`. Keep only ones for tools the repo doesn't manage.
+- **`ZSH_THEME` / `plugins=(...)`** → can't be overridden from
+  `~/.zshrc.local`, since Oh My Zsh has already loaded by then. Change them
+  in `zsh/zshrc` (for everyone) or live with the repo's.
+
+Gotchas coming from an older or different setup:
+
+- **Old Oh My Zsh**: it's reused, not updated — run `omz update`.
+- **Prezto, zinit, antidote, Powerlevel10k, starship…**: no longer loaded.
+  Either add the init line to `~/.zshrc.local` or drop it. (The theme here
+  is `agnoster`, which needs a Powerline/Nerd font in your terminal.)
+- **Behaviour changes**: `rm`/`cp`/`mv` become `-i` (interactive), and the
+  Oh My Zsh `git` plugin is deliberately off — its `gst`/`gco`/… aliases are
+  gone; see `zsh/aliases/git/aliases.zsh` for what's here instead.
+- **Old `~/.tmux.conf`**: different prefix or bindings you relied on go in
+  `tmux/conf.d/` (repo-wide) — there's no tmux equivalent of `.zshrc.local`.
+- **git**: `git diff --no-index ~/.dotfiles-backups/<timestamp>/.gitconfig
+  ~/.gitconfig` shows what changed; put back anything you need, e.g.
+  your own global ignore or `pull.rebase true`. If signing got switched on
+  and you don't want it: `git config --global commit.gpgsign false`.
+
+### 3. Switch over without killing anything
+
+| What | How |
+|---|---|
+| zsh | `exec zsh` in each open shell (new shells already get it). `chsh -s "$(command -v zsh)"` if your login shell is still bash. |
+| tmux | `<prefix> r`, or `tmux source-file ~/.tmux.conf` — the server and everything in it (Claude sessions included) keeps running. |
+| Claude Code | New sessions pick up the settings; in a running one, `/remote-control`. |
+
+**tmux caveat:** sourcing a config *adds* to what the server already has;
+it doesn't clear it. Bindings or options from the old config (e.g. a
+`C-a` prefix) stay active alongside the new ones until the tmux server
+restarts. That's harmless, so do the restart (`tmux kill-server`, then
+`claude-tmux` / `tmux` again) whenever nothing important is running — not
+before.
+
+### 4. Check, and how to back out
+
+```bash
+readlink ~/.zshrc ~/.tmux.conf                     # both point into ~/dotfiles
+tmux show -sv extended-keys                        # on
+jq .remoteControlAtStartup ~/.claude/settings.json # true
+```
+
+To back out: delete the symlinks, then copy everything in the backup
+folder back over your home directory — `cp -a
+~/.dotfiles-backups/<timestamp>/. ~/` — which restores the replaced files
+and the pre-edit `~/.gitconfig`, `~/.ssh/config` and `allowed_signers`. Tools that got installed (nvm, uv, Claude Code…) live in
+your home directory and can be left or removed individually.
+
+## Updating a machine already using these dotfiles
+
+```bash
+dotfiles-update     # = cd ~/dotfiles && git pull --ff-only && ./install.sh
+exec zsh
+```
+
+Then reload what changed, same as step 3 above: `<prefix> r` for tmux,
+`<prefix> I` if `conf.d/plugins.conf` gained a plugin, a new Claude session
+for Claude settings. If a pull added a new base package, also run
+`sudo ~/dotfiles/packages/setup.sh`.
+
+- **Local edits** in `~/dotfiles`: commit or `git stash` them first.
+- **`--ff-only` refuses** because the copy has its own commits:
+  `git pull --rebase`, or push those commits somewhere first.
+- **Very old copy without `dotfiles-update`**: run the three commands
+  by hand once; it exists afterwards.
+- **No `.git` in `~/dotfiles`** (scp'd/rsync'd over): treat it like the
+  adoption case above — move it aside, clone fresh, diff for anything
+  worth keeping.
+- **Rolling back**: `git log` to find the last good commit,
+  `git checkout <commit>`, reload as above.
 
 ## Creating a new user with this setup already applied
 
@@ -291,6 +474,22 @@ Detach with the usual `<prefix> d` — Claude Code keeps running in the
 background (including through an SSH disconnect), and `claude-tmux` from any
 terminal picks the same session back up. Other tmux shortcuts: `tm` (tmux),
 `tma <name>` (attach), `tml` (list sessions), `tmk <name>` (kill a session).
+
+`conf.d/options.conf` sets a few options so Claude Code (and other modern
+TUIs) behave inside tmux the way they do in a bare terminal:
+
+- `extended-keys` + `extkeys` — Shift+Enter reaches Claude as a newline
+  instead of collapsing to plain Enter (which would submit the prompt).
+  The outer terminal has to support extended keys too.
+- `set-clipboard on` — OSC 52 copies from inside a pane (Claude's `/copy`,
+  yanks over SSH) land in your local clipboard.
+- `hyperlinks` — file paths and URLs Claude prints are clickable.
+- `allow-passthrough on` — notification escape sequences reach the outer
+  terminal.
+
+Claude Code rings the terminal bell when it's waiting for input, and
+`conf.d/statusbar.conf` paints a window that rang it red in the status
+bar — so a backgrounded `claude-tmux` window that needs you stands out.
 
 ## SSH setup (`ssh/`)
 
@@ -469,6 +668,12 @@ a backstop, truncates any appended lines back off afterward — same
 approach as `bun/setup.sh`. `~/.local/bin` is already on `PATH` via
 `zsh/exports/core/exports.zsh`.
 
+It also sets `"remoteControlAtStartup": true` in `~/.claude/settings.json`
+on every run, so every session can be picked up from claude.ai or the
+mobile app. Only that one key is touched (merged in with `jq`); the rest of
+`settings.json` is machine-specific and isn't tracked here. If `jq` is
+missing the step is skipped with a note.
+
 ## WakaTime setup (`wakatime/setup.sh`)
 
 Unprivileged, run automatically by `install.sh` (skipped with a note if
@@ -643,3 +848,22 @@ a real script rather than a one-line dependency check like `zsh`/`git`/
 `pip`, `venv`, and `pipx` are deliberately not installed here — see
 [uv setup](#uv-setup-uvsetupsh) above, which `install.sh` runs
 automatically without root and which replaces all three.
+
+## Base packages (`packages/setup.sh`)
+
+Needs root (apt), so it's never run automatically by `install.sh` — run it
+once on a new machine, before `install.sh`:
+
+```bash
+sudo ~/dotfiles/packages/setup.sh
+```
+
+Installs everything the unprivileged scripts expect to already be there,
+so `install.sh` doesn't stop or skip steps with "not installed" notes:
+
+- `zsh`, `git`, `curl` — hard requirements of `install.sh` itself
+- `tmux`, `nano` — configured by `tmux/setup.sh` and `nano/setup.sh`
+- `zip`, `unzip` — used by the SDKMAN, bun and WakaTime installers
+- `jq` — used by `claude/setup.sh` to edit `~/.claude/settings.json`
+
+Only missing packages are installed, so it's safe to re-run any time.

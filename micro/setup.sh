@@ -13,7 +13,7 @@
 #   sudo ~/dotfiles/micro/setup.sh [username]
 #
 # username is whose ~/.config/micro/settings.json gets linked; defaults to
-# $SUDO_USER (whoever ran sudo) if not given. Resolved explicitly via
+# $SUDO_USER (whoever ran sudo), or root when run as root without sudo. Resolved explicitly via
 # getent rather than $HOME, since $HOME under sudo is root's home, not
 # the invoking user's.
 #
@@ -27,7 +27,11 @@ if [ "$(id -u)" -ne 0 ]; then
 fi
 
 MICRO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-TARGET_USER="${1:-${SUDO_USER:-}}"
+# shellcheck source=../lib/backup.sh
+source "$MICRO_DIR/../lib/backup.sh"
+# Whoever ran sudo; or, logged in as root directly (no sudo, so no
+# $SUDO_USER), root itself -- same fallback as cleanup.sh.
+TARGET_USER="${1:-${SUDO_USER:-$(id -un)}}"
 
 if command -v micro >/dev/null 2>&1; then
   echo "==> micro already installed, skipping install"
@@ -38,7 +42,7 @@ else
 fi
 
 if [ -z "$TARGET_USER" ] || ! id "$TARGET_USER" >/dev/null 2>&1; then
-  echo "==> No valid target user given (and \$SUDO_USER unset) -- skipping settings.json link."
+  echo "==> User '$TARGET_USER' does not exist -- skipping settings.json link."
   echo "    Link it yourself: ln -sf $MICRO_DIR/settings.json ~/.config/micro/settings.json"
 else
   TARGET_HOME="$(getent passwd "$TARGET_USER" | cut -d: -f6)"
@@ -46,8 +50,10 @@ else
   echo "==> Linking $TARGET_HOME/.config/micro/settings.json"
   install -o "$TARGET_USER" -g "$TARGET_GROUP" -d "$TARGET_HOME/.config/micro"
   if [ -e "$TARGET_HOME/.config/micro/settings.json" ] && [ ! -L "$TARGET_HOME/.config/micro/settings.json" ]; then
-    mv "$TARGET_HOME/.config/micro/settings.json" "$TARGET_HOME/.config/micro/settings.json.bak.$(date +%Y%m%d%H%M%S)"
-    echo "    backed up existing settings.json"
+    # Into the target user's backup folder, not root's -- and handed back
+    # to them, since root just created it.
+    DOTFILES_BACKUP_HOME="$TARGET_HOME" backup_file "$TARGET_HOME/.config/micro/settings.json"
+    chown -R "$TARGET_USER:$TARGET_GROUP" "$TARGET_HOME/.dotfiles-backups"
   fi
   ln -sf "$MICRO_DIR/settings.json" "$TARGET_HOME/.config/micro/settings.json"
   chown -h "$TARGET_USER:$TARGET_GROUP" "$TARGET_HOME/.config/micro/settings.json"

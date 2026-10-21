@@ -1,0 +1,4 @@
+# Resolve `# shellcheck source=` paths relative to each script, and follow
+# them, so scripts can source lib/backup.sh without per-file -x flags.
+source-path=SCRIPTDIR
+external-sources=true

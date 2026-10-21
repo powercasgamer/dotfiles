@@ -47,4 +47,18 @@ else
   fi
 fi
 
+# Always start sessions with Remote Control on, so any session can be picked
+# up from claude.ai or the mobile app. Merged into settings.json rather than
+# replacing it -- the rest of that file is machine-specific.
+echo "==> Enabling Remote Control at startup"
+SETTINGS="$HOME/.claude/settings.json"
+if ! command -v jq >/dev/null 2>&1; then
+  echo "    'jq' is missing, skipping. Install it (sudo ~/dotfiles/packages/setup.sh) and re-run,"
+  echo "    or enable it from /config inside Claude Code."
+else
+  mkdir -p "$(dirname "$SETTINGS")"
+  [ -s "$SETTINGS" ] || echo '{}' > "$SETTINGS"
+  jq '.remoteControlAtStartup = true' "$SETTINGS" > "$SETTINGS.tmp" && mv "$SETTINGS.tmp" "$SETTINGS"
+fi
+
 echo "==> Done"
