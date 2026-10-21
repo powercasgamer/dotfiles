@@ -791,7 +791,9 @@ jitter, `Persistent=true` so a missed run — e.g. laptop asleep — fires on
 next boot).
 
 `cleanup.sh` itself is privilege-aware and safe to run directly at any
-time, with or without root:
+time, with or without root. Run by hand it asks for confirmation first
+(`-y`/`--yes` skips that); `-n`/`--dry-run` changes nothing, and any
+other argument is rejected rather than ignored:
 
 - **Docker** (any user in the `docker` group, or root): prunes stopped
   containers older than 7 days, images unused by any container older than

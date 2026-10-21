@@ -17,13 +17,15 @@
 # see below).
 #
 # Usage:
-#   ./cleanup.sh [--dry-run]
+#   ./cleanup.sh [-n|--dry-run] [-y|--yes]
 #
 # When run interactively (a TTY) without --dry-run, asks for confirmation
 # first (via gum if installed, else a plain y/N read) since this deletes
 # things for real. Skipped automatically for --dry-run and for
 # non-interactive runs (e.g. the systemd timer from setup.sh), so the
-# unattended schedule is never blocked waiting on input.
+# unattended schedule is never blocked waiting on input; --yes skips it
+# by hand. Unknown arguments are an error, so a typo like --dryrun can't
+# fall through to a real run.
 #
 # Env vars (all ages accept docker-style durations like 168h/30d, or find's
 # day counts where noted):
@@ -46,8 +48,23 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
 
+usage() {
+  echo "Usage: $0 [-n|--dry-run] [-y|--yes]"
+  echo "  -n, --dry-run  print what would be removed, change nothing"
+  echo "  -y, --yes      skip the confirmation prompt"
+  echo "Thresholds are env vars -- see the comment header in $0."
+}
+
 DRY_RUN=0
-[[ "${1:-}" == "--dry-run" ]] && DRY_RUN=1
+ASSUME_YES=0
+for arg in "$@"; do
+  case "$arg" in
+    -n|--dry-run) DRY_RUN=1 ;;
+    -y|--yes)     ASSUME_YES=1 ;;
+    -h|--help)    usage; exit 0 ;;
+    *)            echo "Unknown argument: $arg" >&2; usage >&2; exit 2 ;;
+  esac
+done
 
 DOCKER_CONTAINER_AGE="${DOCKER_CONTAINER_AGE:-168h}"
 DOCKER_IMAGE_AGE="${DOCKER_IMAGE_AGE:-720h}"
@@ -64,7 +81,7 @@ TARGET_USER="${TARGET_USER:-${SUDO_USER:-$(id -un)}}"
 IS_ROOT=0
 [[ "$(id -u)" -eq 0 ]] && IS_ROOT=1
 
-if [[ "$DRY_RUN" -eq 0 && -t 0 ]]; then
+if [[ "$DRY_RUN" -eq 0 && "$ASSUME_YES" -eq 0 && -t 0 ]]; then
   PROMPT="This will prune Docker resources, vacuum journald/apt/flatpak, delete old rotated logs, and empty trash/thumbnails older than ${TRASH_AGE_DAYS}d for '$TARGET_USER'. Continue?"
   if command -v gum >/dev/null 2>&1; then
     gum confirm "$PROMPT" || { echo "Cancelled." >&2; exit 1; }
