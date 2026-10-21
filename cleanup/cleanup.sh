@@ -148,7 +148,9 @@ if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
     while IFS=$'\t' read -r cid cname; do
       logpath="$(docker inspect --format='{{.LogPath}}' "$cid" 2>/dev/null || true)"
       [[ -z "$logpath" || ! -f "$logpath" ]] && continue
-      size_mb=$(( $(stat -c%s "$logpath") / 1024 / 1024 ))
+      # 0 if it vanished since (container removed mid-run), rather than
+      # an empty $(( / 1024 )) ending the whole run.
+      size_mb=$(( $(stat -c%s "$logpath" 2>/dev/null || echo 0) / 1024 / 1024 ))
       if [[ "$size_mb" -gt "$DOCKER_LOG_MAX_MB" ]]; then
         echo "    $cname: ${size_mb}MB -> truncating"
         run truncate -s 0 "$logpath"
@@ -224,7 +226,7 @@ if [[ "$IS_ROOT" -eq 1 ]]; then
 
       if [[ "$LOG_TRUNCATE_UNROTATED" -eq 1 ]]; then
         while IFS= read -r -d '' f; do
-          size_mb=$(( $(stat -c%s "$f") / 1024 / 1024 ))
+          size_mb=$(( $(stat -c%s "$f" 2>/dev/null || echo 0) / 1024 / 1024 ))
           if [[ "$size_mb" -gt "$LOG_TRUNCATE_MB" ]]; then
             echo "    $name: $f is ${size_mb}MB -> truncating (copytruncate-style, keeps the fd valid)"
             run truncate -s 0 "$f"
