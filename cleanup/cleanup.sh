@@ -107,7 +107,21 @@ run() {
   fi
 }
 
+# Bytes used on the filesystems this script cleans, each counted once
+# (several of these paths usually share one). Only those, not every
+# mount: on WSL, say, the Windows drive's own churn would swamp the
+# number.
+disk_used() {
+  local paths=() p
+  for p in / /var /var/lib/docker /var/lib/flatpak /home; do
+    [[ -e "$p" ]] && paths+=("$p")
+  done
+  { df -B1 --output=source,used "${paths[@]}" 2>/dev/null || true; } \
+    | awk 'NR > 1 && !seen[$1]++ { sum += $2 } END { print sum + 0 }'
+}
+
 echo "==> Cleanup starting $(date -Iseconds) (dry-run=$DRY_RUN, root=$IS_ROOT, target-user=$TARGET_USER)"
+USED_BEFORE="$(disk_used)"
 
 # ---- Docker ----------------------------------------------------------
 if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
@@ -244,6 +258,14 @@ if [[ -n "$TARGET_HOME" && -d "$TARGET_HOME" ]]; then
   fi
 else
   echo "==> Trash/thumbnails: could not resolve home for '$TARGET_USER', skipping"
+fi
+
+if [[ "$DRY_RUN" -eq 0 ]]; then
+  # Net change, so anything else writing to disk meanwhile counts against
+  # it -- close enough for a weekly "was this worth it".
+  freed=$(( USED_BEFORE - $(disk_used) ))
+  (( freed < 0 )) && freed=0
+  echo "==> Freed about $(numfmt --to=iec "$freed")"
 fi
 
 if [[ "${#FAILED[@]}" -gt 0 ]]; then
