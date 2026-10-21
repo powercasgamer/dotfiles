@@ -65,6 +65,9 @@ dotfiles/
 │   └── setup.sh                  # installs python3 + python3-dev via apt (opt-in, NOT run by install.sh)
 ├── packages/
 │   └── setup.sh                  # apt: zsh git curl tmux nano zip unzip jq (run first, as root; NOT run by install.sh)
+├── apt/
+│   ├── setup.sh                  # apt.conf.d drop-ins that speed up apt update (opt-in, NOT run by install.sh)
+│   └── maintenance.sh            # update + upgrade + autoremove + leftover-config purge, run by hand
 └── zsh/
     ├── zshrc                       # main config (becomes ~/.zshrc via symlink)
     ├── zshrc.local.example         # template -> ~/.zshrc.local (host tweaks, not tracked)
@@ -835,6 +838,33 @@ and the run exits 1, so the timer's unit shows up in `systemctl
 `journalctl -u dotfiles-cleanup --since -30d`, run it on demand with
 `sudo systemctl start dotfiles-cleanup.service`, and check the next
 scheduled run with `systemctl list-timers dotfiles-cleanup.timer`.
+
+## apt maintenance (`apt/maintenance.sh`)
+
+One command for routine package upkeep, run by hand rather than on a
+timer since it upgrades things:
+
+```bash
+~/dotfiles/apt/maintenance.sh --dry-run   # simulate it all, no root needed
+sudo ~/dotfiles/apt/maintenance.sh        # do it, prompting at each step
+sudo ~/dotfiles/apt/maintenance.sh --yes  # unattended (keeps your config files on conflicts)
+```
+
+It checks there's enough free space on `/`, `/var` and `/boot`
+(`MIN_FREE_MB`, `MIN_BOOT_FREE_MB`) and that no earlier dpkg run was left
+half-finished, then runs `apt-get update`, `upgrade --with-new-pkgs`
+(`--full` for `full-upgrade`, which may remove packages), `autoremove
+--purge`, purges config left behind by already-removed packages, and
+`autoclean`. It ends by listing held packages and whether a reboot is
+needed. Each step shows apt's own package list and `[Y/n]` prompt;
+declining one, or any step failing, stops the run there.
+
+Old kernels go through `autoremove`, whose rules always keep the running
+kernel and the newest ones, rather than through hand-picked `apt purge
+linux-image-*` (which also catches the `linux-image-generic` metapackage
+that brings in future kernels). Held packages are reported but never
+unheld, and nothing is held on your behalf during the run, so kernel and
+firmware security updates aren't blocked.
 
 ## Python setup (`python/setup.sh`)
 
