@@ -3,6 +3,8 @@ if (( EUID == 0 )); then _sudo=""; else _sudo="sudo "; fi
 alias update="${_sudo}apt update && ${_sudo}apt upgrade -y"
 alias install="${_sudo}apt install"
 alias autoremove="${_sudo}apt autoremove -y"
+# update + upgrade + autoremove + leftover-config purge, prompting per step.
+alias maintenance="${_sudo}$HOME/dotfiles/apt/maintenance.sh"
 alias ports="${_sudo}ss -tulpn"
 unset _sudo
 alias myip="curl -s ifconfig.me"

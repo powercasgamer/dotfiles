@@ -77,7 +77,7 @@ dotfiles/
     │   ├── ls/aliases.zsh          # ls/ll/lt, grep colors
     │   ├── nav/aliases.zsh         # .., ..., -
     │   ├── safety/aliases.zsh      # rm/cp/mv -i
-    │   ├── system/aliases.zsh      # apt update/install, ports, myip, nukejetbrains
+    │   ├── system/aliases.zsh      # apt update/install, maintenance, ports, myip, nukejetbrains
     │   ├── tmux/aliases.zsh        # tm/tma/tml/tmk/tmn, claude-tmux
     │   ├── docker/aliases.zsh      # d, dc, dps, dcup/dcdown, docker-compose compat
     │   ├── gradle/aliases.zsh      # gbuild, cleangradle
@@ -845,6 +845,7 @@ One command for routine package upkeep, run by hand rather than on a
 timer since it upgrades things:
 
 ```bash
+maintenance                               # zsh alias for the sudo line below
 ~/dotfiles/apt/maintenance.sh --dry-run   # simulate it all, no root needed
 sudo ~/dotfiles/apt/maintenance.sh        # do it, prompting at each step
 sudo ~/dotfiles/apt/maintenance.sh --yes  # unattended (keeps your config files on conflicts)

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # apt housekeeping in one go: refresh package lists, upgrade, then remove
-# what's no longer needed. Run by hand -- unlike cleanup.sh it upgrades
-# packages, so it's not put on a timer.
+# what's no longer needed. Run by hand (the `maintenance` zsh alias) --
+# unlike cleanup.sh it upgrades packages, so it's not put on a timer.
 #
 # Steps, in order:
 #   1. Pre-flight: enough free space on /, /var and /boot, and no packages
