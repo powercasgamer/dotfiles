@@ -40,7 +40,7 @@
 #                                                     history rather than archiving it. Root only.
 #   LOG_TRUNCATE_MB        default 200           -- size threshold for LOG_TRUNCATE_UNROTATED
 #   SERVICE_LOGS_FILE      default: service-logs.txt next to this script
-#   TRASH_AGE_DAYS         default 30             -- files in ~/.local/share/Trash
+#   TRASH_AGE_DAYS         default 30             -- items in ~/.local/share/Trash trashed longer ago than this
 #   TARGET_USER            default: $SUDO_USER, else current user -- whose trash/cache to clean
 set -euo pipefail
 
@@ -201,12 +201,16 @@ fi
 # ---- user trash + thumbnail cache --------------------------------------
 TARGET_HOME="$(getent passwd "$TARGET_USER" | cut -d: -f6)"
 if [[ -n "$TARGET_HOME" && -d "$TARGET_HOME" ]]; then
-  echo "==> Trash: items older than ${TRASH_AGE_DAYS}d in $TARGET_HOME/.local/share/Trash"
-  if [[ -d "$TARGET_HOME/.local/share/Trash/files" ]]; then
-    while IFS= read -r -d '' f; do
-      base="$(basename -- "$f")"
-      run rm -rf -- "$f" "$TARGET_HOME/.local/share/Trash/info/$base.trashinfo"
-    done < <(find "$TARGET_HOME/.local/share/Trash/files" -mindepth 1 -maxdepth 1 -mtime +"$TRASH_AGE_DAYS" -print0)
+  TRASH_DIR="$TARGET_HOME/.local/share/Trash"
+  echo "==> Trash: items trashed more than ${TRASH_AGE_DAYS}d ago in $TRASH_DIR"
+  # Aged by when each item was trashed, not by its own mtime (which
+  # trashing leaves alone -- a year-old file trashed yesterday would go on
+  # the next run). Its .trashinfo is written at trash time, so go by that.
+  if [[ -d "$TRASH_DIR/info" ]]; then
+    while IFS= read -r -d '' info; do
+      base="$(basename -- "$info" .trashinfo)"
+      run rm -rf -- "$TRASH_DIR/files/$base" "$info"
+    done < <(find "$TRASH_DIR/info" -mindepth 1 -maxdepth 1 -name '*.trashinfo' -mtime +"$TRASH_AGE_DAYS" -print0)
   fi
 
   echo "==> Thumbnail cache: $TARGET_HOME/.cache/thumbnails"

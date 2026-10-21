@@ -817,7 +817,8 @@ time, with or without root:
   discards history rather than archiving it) any `*.log` in those
   directories past `LOG_TRUNCATE_MB` (default 200).
 - **Trash + thumbnails** (any user, targets `$TARGET_USER`'s home):
-  empties `~/.local/share/Trash` items and `~/.cache/thumbnails` entries
+  empties `~/.local/share/Trash` items trashed more than 30 days ago (by
+  trash date, not the file's own age) and `~/.cache/thumbnails` entries
   older than 30 days.
 
 All the age/size thresholds are env vars (`DOCKER_CONTAINER_AGE`,
