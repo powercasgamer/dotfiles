@@ -827,7 +827,10 @@ All the age/size thresholds are env vars (`DOCKER_CONTAINER_AGE`,
 `DOCKER_IMAGE_AGE`, `DOCKER_BUILDCACHE_AGE`, `DOCKER_LOG_MAX_MB`,
 `JOURNAL_RETENTION`, `LOG_AGE_DAYS`, `LOG_TRUNCATE_UNROTATED`,
 `LOG_TRUNCATE_MB`, `SERVICE_LOGS_FILE`, `TRASH_AGE_DAYS`) — see the
-comment header in `cleanup.sh` for defaults. Check logs with
+comment header in `cleanup.sh` for defaults. A step that fails is
+skipped rather than ending the run; the failures are listed at the end
+and the run exits 1, so the timer's unit shows up in `systemctl
+--failed`. Check logs with
 `journalctl -u dotfiles-cleanup --since -30d`, run it on demand with
 `sudo systemctl start dotfiles-cleanup.service`, and check the next
 scheduled run with `systemctl list-timers dotfiles-cleanup.timer`.

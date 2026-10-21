@@ -91,11 +91,19 @@ if [[ "$DRY_RUN" -eq 0 && "$ASSUME_YES" -eq 0 && -t 0 ]]; then
   fi
 fi
 
+# A failing step (flatpak repair, a docker prune racing a container
+# start, ...) is noted and skipped rather than aborting the run under
+# set -e, so one broken section doesn't stop every section after it. Any
+# failures are listed at the end and make the run exit 1 -- which marks
+# the systemd unit failed, so it shows up in `systemctl --failed`.
+FAILED=()
+
 run() {
   if [[ "$DRY_RUN" -eq 1 ]]; then
     echo "    [dry-run] $*"
-  else
-    "$@"
+  elif ! "$@"; then
+    echo "    !! failed, continuing: $*" >&2
+    FAILED+=("$*")
   fi
 }
 
@@ -216,7 +224,7 @@ else
 fi
 
 # ---- user trash + thumbnail cache --------------------------------------
-TARGET_HOME="$(getent passwd "$TARGET_USER" | cut -d: -f6)"
+TARGET_HOME="$(getent passwd "$TARGET_USER" | cut -d: -f6 || true)"
 if [[ -n "$TARGET_HOME" && -d "$TARGET_HOME" ]]; then
   TRASH_DIR="$TARGET_HOME/.local/share/Trash"
   echo "==> Trash: items trashed more than ${TRASH_AGE_DAYS}d ago in $TRASH_DIR"
@@ -238,4 +246,9 @@ else
   echo "==> Trash/thumbnails: could not resolve home for '$TARGET_USER', skipping"
 fi
 
+if [[ "${#FAILED[@]}" -gt 0 ]]; then
+  echo "==> Cleanup finished $(date -Iseconds) with ${#FAILED[@]} failed step(s):" >&2
+  printf '    %s\n' "${FAILED[@]}" >&2
+  exit 1
+fi
 echo "==> Cleanup finished $(date -Iseconds)"
