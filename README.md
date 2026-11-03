@@ -591,11 +591,12 @@ touching any profile file at all — the actual sourcing lives in
 
 `nvm.zsh` lazy-loads: `nvm.sh` runs `nvm use` on every shell startup by
 default (`nvm_auto`), which measured as ~half of total shell startup time
-with no payoff here (nothing uses its `.nvmrc` auto-switch). Instead,
-`nvm`/`node`/`npm`/`npx`/`corepack` are stubbed out; the first call to any
-of them sources the real `nvm.sh` once and replaces the stubs with nvm's
-real functions, so nothing else changes — just no longer paid on every
-new shell.
+with no payoff here (nothing uses its `.nvmrc` auto-switch). Instead, the
+`default` alias is resolved straight from `~/.nvm/alias/` and that version's
+`bin/` is put on `PATH`, so `node`/`npm`/`npx`/`corepack` are real binaries
+(visible to child processes and `#!/usr/bin/env node`). Only `nvm` is a
+stub: its first call sources `nvm.sh --no-use`. A `PATH` that already holds
+an nvm node (e.g. a subshell after `nvm use`) is left alone.
 
 ## bun setup (`bun/setup.sh`)
 
