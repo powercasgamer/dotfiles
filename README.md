@@ -91,7 +91,7 @@ dotfiles/
     └── functions/
         ├── core/functions.zsh      # mkcd, bak, psgrep, bsha256/bsha512, rsync-copy, dl, paste
         ├── dotfiles/functions.zsh  # dotfiles-update (git pull + re-run install.sh)
-        ├── gradle/functions.zsh    # killgradlehard, killgradle (force/graceful daemon kill)
+        ├── gradle/functions.zsh    # killgradlehard, killgradle (force/graceful daemon kill), update-gradle
         ├── git/functions.zsh      # gsfp, gcpp, gca, gsca, gpush, gsize, glfs
         └── system/functions.zsh   # killgateway
 ```
