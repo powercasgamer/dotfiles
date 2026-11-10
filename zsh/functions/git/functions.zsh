@@ -11,6 +11,10 @@ gsfp() {
   git fetch || return 1
   git pull --no-edit
 }
+# Tab-complete branch names exactly like `git switch` does (local branches,
+# plus remote ones it can DWIM-track). compinit has already run via
+# oh-my-zsh by the time this file is sourced, so compdef is available.
+(( $+functions[compdef] )) && compdef _git gsfp=git-switch
 
 # Format (gradle spotless), commit, push to main, and publish -- one shot
 # for a gradle project release commit. Stops at the first failure so a
