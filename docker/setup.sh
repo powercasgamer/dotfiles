@@ -1,17 +1,19 @@
 #!/usr/bin/env bash
 # Installs Docker Engine + the Compose plugin from Docker's official apt
-# repo, merges daemon hardening into /etc/docker/daemon.json, and adds a user to the docker group.
+# repo, merges daemon hardening into /etc/docker/daemon.json, and, only when
+# asked with --add-user, adds a user to the docker group.
 #
 # Must run as root (apt, systemctl, usermod). NOT run automatically by
 # install.sh -- like tmux's system package and ssh/harden-server.sh, this
 # needs root, which the regular unprivileged install.sh flow doesn't have.
 #
 # Usage:
-#   sudo ~/dotfiles/docker/setup.sh [username]
+#   sudo ~/dotfiles/docker/setup.sh [--add-user [username]]
 #
-# username defaults to $SUDO_USER (whoever ran sudo), or root when run as
-# root without sudo -- in which case group membership is skipped, since
-# root can use docker already.
+# Without --add-user, nobody is added to the docker group. With it, username
+# defaults to $SUDO_USER (whoever ran sudo), or root when run as root without
+# sudo -- in which case group membership is skipped, since root can use
+# docker already.
 #
 # Being in the docker group is equivalent to passwordless root on this
 # machine -- anyone in it can bind-mount the host filesystem into a
@@ -34,7 +36,13 @@ DOCKER_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$DOCKER_DIR/../lib/backup.sh"
 # Whoever ran sudo; or, logged in as root directly (no sudo, so no
 # $SUDO_USER), root itself -- same fallback as cleanup.sh.
-TARGET_USER="${1:-${SUDO_USER:-$(id -un)}}"
+ADD_USER=0
+TARGET_USER="${SUDO_USER:-$(id -un)}"
+case "${1:-}" in
+  "") ;;
+  --add-user) ADD_USER=1; [ -n "${2:-}" ] && TARGET_USER="$2" ;;
+  *) echo "Unknown argument: $1 (adding a user to the docker group needs --add-user $1)" >&2; exit 1 ;;
+esac
 
 if command -v docker >/dev/null 2>&1 && docker compose version >/dev/null 2>&1; then
   echo "==> Docker Engine + Compose already installed, skipping install"
@@ -85,7 +93,9 @@ else
 fi
 
 echo "==> docker group"
-if [ "$(id -u "$TARGET_USER" 2>/dev/null)" = 0 ]; then
+if [ "$ADD_USER" -eq 0 ]; then
+  echo "    nobody added (root-equivalent; pass --add-user [username] to add one)"
+elif [ "$(id -u "$TARGET_USER" 2>/dev/null)" = 0 ]; then
   echo "    $TARGET_USER is root, which can use docker already -- skipping."
   echo "    For another account: usermod -aG docker <username>"
 else

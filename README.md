@@ -155,8 +155,8 @@ What changes when you're root:
 - **Root-only scripts that act on behalf of a user** (`micro/`, `cleanup/`,
   `docker/setup.sh`) default to the user who ran `sudo`, or to root when
   there was no `sudo`. So `micro/setup.sh` links root's settings, and
-  `docker/setup.sh` skips the docker group (root doesn't need it). Pass a
-  username to target someone else.
+  `docker/setup.sh --add-user` skips the docker group (root doesn't need it).
+  Pass a username to target someone else.
 - **zsh aliases** `update`, `install`, `autoremove` and `ports` drop their
   `sudo` prefix.
 - Everything lands in `/root` as usual: `/root/.zshrc`,
@@ -717,11 +717,11 @@ Opt-in only, like `ssh/harden-server.sh` — needs root (apt repo + packages
 `install.sh`.
 
 ```bash
-sudo ~/dotfiles/docker/setup.sh [username]
+sudo ~/dotfiles/docker/setup.sh [--add-user [username]]
 ```
 
-`username` defaults to `$SUDO_USER` (whoever ran `sudo`) if not given. What
-it does:
+Nobody is added to the `docker` group unless you pass `--add-user`;
+`username` then defaults to `$SUDO_USER` (whoever ran `sudo`). What it does:
 
 1. Adds Docker's official apt repo (key to `/etc/apt/keyrings/docker.asc`,
    source to `/etc/apt/sources.list.d/docker.list`, matching this machine's
@@ -743,11 +743,12 @@ it does:
    inter-container communication on the default bridge network only —
    doesn't affect `docker compose`, which creates its own network per
    project regardless).
-4. Adds the target user to the `docker` group.
+4. With `--add-user` only, adds the target user to the `docker` group.
 
 **Docker group membership is root-equivalent** on this machine — anyone in
-it can bind-mount the host filesystem into a container. `new-user.sh`
-reflects that: it's an explicit `--docker` flag, not automatic, for exactly
+it can bind-mount the host filesystem into a container. Both
+`docker/setup.sh --add-user` and `new-user.sh --docker` reflect that: an
+explicit flag, not automatic, for exactly
 the same reason `ssh/harden-server.sh` won't touch `PasswordAuthentication`
 without being asked. After being added to the group, log out/in (or open a
 new terminal) for it to take effect — this shell was already running before
