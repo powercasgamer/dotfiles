@@ -29,7 +29,10 @@
 #
 # Env vars (all ages accept docker-style durations like 168h/30d, or find's
 # day counts where noted):
-#   DOCKER_CONTAINER_AGE   default 168h  (7d)  -- stopped containers older than this
+#   DOCKER_CONTAINER_AGE   default 168h  (7d)  -- stopped containers older than this; "off" skips it.
+#                                                     Use off on game panel hosts (Pterodactyl/Calagopus
+#                                                     Wings): a server stopped for a week is a stopped
+#                                                     container its panel still expects to exist.
 #   DOCKER_IMAGE_AGE       default 720h  (30d) -- images unused by any container, older than this
 #   DOCKER_BUILDCACHE_AGE  default 168h  (7d)  -- build cache older than this
 #   DOCKER_LOG_MAX_MB      default 500          -- truncate any container's json-log past this size (root only)
@@ -144,8 +147,12 @@ if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
   echo "==> Docker: before"
   docker system df
 
-  echo "==> Docker: stopped containers older than $DOCKER_CONTAINER_AGE"
-  run docker container prune -f --filter "until=${DOCKER_CONTAINER_AGE}"
+  if [ "$DOCKER_CONTAINER_AGE" = off ]; then
+    echo "==> Docker: stopped containers -- skipped (DOCKER_CONTAINER_AGE=off)"
+  else
+    echo "==> Docker: stopped containers older than $DOCKER_CONTAINER_AGE"
+    run docker container prune -f --filter "until=${DOCKER_CONTAINER_AGE}"
+  fi
 
   echo "==> Docker: unused images older than $DOCKER_IMAGE_AGE"
   run docker image prune -af --filter "until=${DOCKER_IMAGE_AGE}"

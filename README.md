@@ -848,7 +848,10 @@ All the age/size thresholds are env vars (`DOCKER_CONTAINER_AGE`,
 `DOCKER_IMAGE_AGE`, `DOCKER_BUILDCACHE_AGE`, `DOCKER_LOG_MAX_MB`,
 `JOURNAL_RETENTION`, `LOG_AGE_DAYS`, `LOG_TRUNCATE_UNROTATED`,
 `LOG_TRUNCATE_MB`, `SERVICE_LOGS_FILE`, `TRASH_AGE_DAYS`) — see the
-comment header in `cleanup.sh` for defaults. Each real run ends by
+comment header in `cleanup.sh` for defaults. On a game panel host
+(Pterodactyl or Calagopus Wings) set `DOCKER_CONTAINER_AGE=off`: a game
+server stopped for a week is a stopped container the panel still expects
+to exist. Each real run ends by
 printing roughly how much space it freed, and only one runs at a time
 (a second one started meanwhile exits instead). A step that fails is
 skipped rather than ending the run; the failures are listed at the end
