@@ -730,9 +730,12 @@ it does:
    `docker-compose-plugin` — skipped if `docker` + `docker compose` are
    already present.
 2. Enables and starts the `docker` service.
-3. Installs `docker/daemon.json` to `/etc/docker/daemon.json` (backing up
-   anything already there that differs) and restarts the daemon **only**
-   when the content actually changed — `live-restore: true` in that file
+3. Installs `docker/daemon.json` to `/etc/docker/daemon.json`, or, if that
+   file already exists, **merges** it in with `jq`: keys already in the host
+   file win, so host-specific settings (a bind address, address pools, a
+   bigger log cap) survive a re-run, and only missing keys are added. It
+   backs up the old file and restarts the daemon **only** when the content
+   actually changed — `live-restore: true` in that file
    means running containers survive the restart either way. Hardening in
    that file: JSON log rotation (`max-size: 10m`, `max-file: 3` — the
    default log driver has no rotation at all and will happily fill your

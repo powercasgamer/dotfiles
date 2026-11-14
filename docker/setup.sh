@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Installs Docker Engine + the Compose plugin from Docker's official apt
-# repo, applies daemon hardening, and adds a user to the docker group.
+# repo, merges daemon hardening into /etc/docker/daemon.json, and adds a user to the docker group.
 #
 # Must run as root (apt, systemctl, usermod). NOT run automatically by
 # install.sh -- like tmux's system package and ssh/harden-server.sh, this
@@ -19,7 +19,8 @@
 # have that level of access.
 #
 # Safe to re-run: skips the apt install if docker + compose are already
-# present, and only restarts the daemon if daemon.json actually changed
+# present, never overwrites a key already in /etc/docker/daemon.json, and
+# only restarts the daemon if daemon.json actually changed
 # (live-restore keeps containers running across that restart regardless).
 set -euo pipefail
 
@@ -61,13 +62,26 @@ systemctl enable --now docker >/dev/null
 
 echo "==> Docker daemon hardening"
 mkdir -p /etc/docker
-if ! cmp -s "$DOCKER_DIR/daemon.json" /etc/docker/daemon.json 2>/dev/null; then
-  backup_file /etc/docker/daemon.json cp
-  cp "$DOCKER_DIR/daemon.json" /etc/docker/daemon.json
+# Merge rather than overwrite: keys already in /etc/docker/daemon.json win, so
+# host-specific settings (bind address, address pools, a bigger log cap) survive
+# a re-run. Only keys the host file doesn't have are added from ours.
+DAEMON_JSON=/etc/docker/daemon.json
+if [ ! -e "$DAEMON_JSON" ]; then
+  cp "$DOCKER_DIR/daemon.json" "$DAEMON_JSON"
   systemctl restart docker
-  echo "    daemon.json updated, docker restarted (live-restore kept containers up)"
+  echo "    daemon.json installed, docker restarted (live-restore kept containers up)"
+elif ! command -v jq >/dev/null 2>&1; then
+  echo "    $DAEMON_JSON exists and jq isn't installed to merge it -- leaving it as-is."
+  echo "    Compare by hand with $DOCKER_DIR/daemon.json"
+elif ! MERGED="$(jq -s '.[0] * .[1]' "$DOCKER_DIR/daemon.json" "$DAEMON_JSON")"; then
+  echo "    $DAEMON_JSON isn't valid JSON -- leaving it as-is." >&2
+elif [ "$(jq -S . <<<"$MERGED")" != "$(jq -S . "$DAEMON_JSON")" ]; then
+  backup_file "$DAEMON_JSON" cp
+  printf '%s\n' "$MERGED" > "$DAEMON_JSON"
+  systemctl restart docker
+  echo "    daemon.json merged (existing keys kept), docker restarted (live-restore kept containers up)"
 else
-  echo "    daemon.json already up to date, skipping restart"
+  echo "    daemon.json already has every key, skipping restart"
 fi
 
 echo "==> docker group"
