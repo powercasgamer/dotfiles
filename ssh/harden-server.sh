@@ -26,7 +26,11 @@ if ! command -v sshd >/dev/null 2>&1; then
 fi
 
 SSH_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-DEST="/etc/ssh/sshd_config.d/99-dotfiles-hardening.conf"
+# 10-, not 99-: sshd keeps the FIRST value it reads for each option and reads
+# sshd_config.d/*.conf in name order, so a provider's 50-cloud-init.conf
+# (often PasswordAuthentication yes) would otherwise win over this file.
+DEST="/etc/ssh/sshd_config.d/10-dotfiles-hardening.conf"
+OLD_DEST="/etc/ssh/sshd_config.d/99-dotfiles-hardening.conf"
 BACKUP=""
 if [ -e "$DEST" ]; then
   BACKUP="$(mktemp)"
@@ -47,6 +51,12 @@ if ! sshd -t; then
   exit 1
 fi
 [ -n "$BACKUP" ] && rm -f "$BACKUP"
+
+if [ -e "$OLD_DEST" ]; then
+  echo "==> Removing the old $OLD_DEST (now installed as 10-)"
+  rm -f "$OLD_DEST"
+  sshd -t
+fi
 
 echo "==> Reloading sshd"
 systemctl reload ssh 2>/dev/null || systemctl reload sshd 2>/dev/null || service ssh reload

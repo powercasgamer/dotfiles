@@ -527,9 +527,12 @@ sudo ~/dotfiles/ssh/harden-server.sh
 ```
 
 Installs `ssh/sshd_hardening.conf` to
-`/etc/ssh/sshd_config.d/99-dotfiles-hardening.conf`, validates it with
+`/etc/ssh/sshd_config.d/10-dotfiles-hardening.conf`, validates it with
 `sshd -t` before touching the live service, and rolls back automatically if
-validation fails. Sets `PermitRootLogin no`, `MaxAuthTries 3`,
+validation fails. It's `10-` rather than `99-` because sshd keeps the
+*first* value it reads for each option, in file-name order: a provider's
+`50-cloud-init.conf` with `PasswordAuthentication yes` would otherwise win.
+Re-running removes an old `99-dotfiles-hardening.conf`. Sets `PermitRootLogin no`, `MaxAuthTries 3`,
 `LoginGraceTime 30`, client-alive timeouts, and disables X11/agent
 forwarding.
 
