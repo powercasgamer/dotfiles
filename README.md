@@ -534,14 +534,18 @@ validation fails. It's `10-` rather than `99-` because sshd keeps the
 `50-cloud-init.conf` with `PasswordAuthentication yes` would otherwise win.
 Re-running removes an old `99-dotfiles-hardening.conf`. Sets `PermitRootLogin no`, `MaxAuthTries 3`,
 `LoginGraceTime 30`, client-alive timeouts, and disables X11/agent
-forwarding.
+forwarding, tunnel devices and `~/.ssh/environment`.
 
 **Deliberately leaves `PasswordAuthentication` alone.** On this machine,
 `~/.ssh/authorized_keys` was empty when this was built — disabling password
 auth with no key installed would have locked out all remote access. The
 line is in `ssh/sshd_hardening.conf`, commented out, with instructions:
 once you've added a key to `authorized_keys` and confirmed key-based login
-works from another terminal, uncomment it and re-run the script.
+works from another terminal, uncomment it together with
+`KbdInteractiveAuthentication no` and `AuthenticationMethods publickey` (with
+only the first, PAM's keyboard-interactive can still ask for a password) and
+re-run the script. `AllowTcpForwarding no` is there too, commented, for
+servers nobody tunnels through.
 
 ## SDKMAN setup (`sdkman/setup.sh`)
 
