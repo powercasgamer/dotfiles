@@ -22,6 +22,8 @@ clickhouse-server /var/log/clickhouse-server
 influxdb         /var/log/influxdb
 elasticsearch    /var/log/elasticsearch
 rabbitmq         /var/log/rabbitmq
+pterodactyl-wings /var/log/pterodactyl
+calagopus-wings  /var/log/calagopus-wings
 
 # No standard Debian package/log convention -- these commonly log to
 # stdout/journal unless explicitly pointed at a file. Paths below match
