@@ -22,6 +22,9 @@
 #   --sudo                add the user to the sudo group, so they can use
 #                         sudo instead of needing root. NOT the default --
 #                         same root-equivalent reasoning as --docker.
+#   --groups G1,G2        also add the user to these existing groups, e.g.
+#                         ssh-users on a server with AllowGroups ssh-users.
+#                         A group that doesn't exist is reported, not created.
 #
 # Without --git-name/--git-email, install.sh drops into an interactive
 # prompt for git identity (see git/setup.sh) -- fine when you're running
@@ -33,7 +36,7 @@ if [ "$(id -u)" -ne 0 ]; then
   exit 1
 fi
 
-USERNAME="${1:?Usage: sudo $0 <username> [--no-password] [--git-name NAME] [--git-email EMAIL] [--docker] [--sudo]}"
+USERNAME="${1:?Usage: sudo $0 <username> [--no-password] [--git-name NAME] [--git-email EMAIL] [--docker] [--sudo] [--groups G1,G2]}"
 shift
 
 SET_PASSWORD=1
@@ -41,6 +44,7 @@ NEW_GIT_NAME=""
 NEW_GIT_EMAIL=""
 ADD_DOCKER=0
 ADD_SUDO=0
+EXTRA_GROUPS=""
 while [ $# -gt 0 ]; do
   case "$1" in
     --no-password) SET_PASSWORD=0; shift ;;
@@ -48,6 +52,7 @@ while [ $# -gt 0 ]; do
     --git-email) NEW_GIT_EMAIL="${2:?--git-email needs a value}"; shift 2 ;;
     --docker) ADD_DOCKER=1; shift ;;
     --sudo) ADD_SUDO=1; shift ;;
+    --groups) EXTRA_GROUPS="${2:?--groups needs a comma-separated list}"; shift 2 ;;
     *) echo "Unknown option: $1" >&2; exit 1 ;;
   esac
 done
@@ -114,6 +119,20 @@ if [ "$ADD_DOCKER" -eq 1 ]; then
     echo "    docker group doesn't exist yet -- run docker/setup.sh first, or"
     echo "    re-run: sudo usermod -aG docker $USERNAME"
   fi
+fi
+
+if [ -n "$EXTRA_GROUPS" ]; then
+  echo "==> Extra groups"
+  IFS=, read -ra GROUP_LIST <<<"$EXTRA_GROUPS"
+  for group in "${GROUP_LIST[@]}"; do
+    if getent group "$group" >/dev/null 2>&1; then
+      usermod -aG "$group" "$USERNAME"
+      echo "    added $USERNAME to $group"
+    else
+      echo "    group '$group' doesn't exist on this host -- create it, then:"
+      echo "    usermod -aG $group $USERNAME"
+    fi
+  done
 fi
 
 echo "==> Done. Log in with: su - $USERNAME  (or ssh once a password/key is set)"

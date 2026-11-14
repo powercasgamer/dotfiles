@@ -319,6 +319,7 @@ sudo ~/dotfiles/new-user.sh <username> \
   --git-name "Their Name" --git-email "them@example.com"  # skip the git identity prompt too
 sudo ~/dotfiles/new-user.sh <username> --docker  # also add them to the docker group
 sudo ~/dotfiles/new-user.sh <username> --sudo    # also add them to the sudo group
+sudo ~/dotfiles/new-user.sh <username> --groups ssh-users  # and any other existing groups
 ```
 
 Must be run as root (it calls `useradd`/`apt-get`/`passwd`), so it needs a
@@ -337,6 +338,9 @@ real terminal — same reason `sudo` itself needs one. What it does:
    see the SSH section below.
 5. With `--docker`/`--sudo`, adds them to the `docker`/`sudo` group. Neither
    is the default — both are root-equivalent — so each is opt-in per account.
+   `--groups G1,G2` adds any other existing groups, e.g. `ssh-users` on a server
+   whose sshd has `AllowGroups ssh-users` (without it, the new user can't log in
+   over SSH there).
 
 Each new user gets their own copy of the repo, so they can diverge from
 yours independently, and their own git identity (see below) — nothing here
