@@ -107,7 +107,9 @@ fi
 echo "    run 'gh auth login' to authenticate (not done automatically)"
 
 echo "==> SSH commit/tag signing"
-if [ -z "$GIT_EMAIL" ]; then
+if [ "${DOTFILES_PROFILE:-full}" = server ]; then
+  echo "    skipped (DOTFILES_PROFILE=server: no signing key on a server)"
+elif [ -z "$GIT_EMAIL" ]; then
   echo "    skipped -- no git identity configured (see above)"
 elif [ -f "$SIGNING_KEY" ]; then
   git config --global gpg.format ssh

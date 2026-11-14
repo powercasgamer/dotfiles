@@ -1,7 +1,28 @@
 #!/usr/bin/env bash
 # Sets up Oh My Zsh + this dotfiles/zsh config on a new machine.
 # Safe to re-run.
+#
+# DOTFILES_PROFILE=server installs only the shell basics (zsh, Oh My Zsh,
+# git config, tmux, nano, SSH client config) and skips the dev runtimes
+# (SDKMAN, nvm, bun, pnpm, uv), Claude Code, WakaTime and git commit signing.
+# For servers where root is shared with someone else (a client's box) or
+# nothing gets developed: no runtimes to patch, no signing key on the box,
+# and WakaTime would send file and host names to wakatime.com.
 set -euo pipefail
+
+DOTFILES_PROFILE="${DOTFILES_PROFILE:-full}"
+case "$DOTFILES_PROFILE" in
+  full|server) ;;
+  *) echo "DOTFILES_PROFILE must be full or server, got '$DOTFILES_PROFILE'" >&2; exit 1 ;;
+esac
+export DOTFILES_PROFILE
+# Runs a step only in the full profile; in the server profile it says so.
+full_only() {
+  if [ "$DOTFILES_PROFILE" = server ]; then
+    echo "    skipped (DOTFILES_PROFILE=server)"
+    return 1
+  fi
+}
 
 DOTFILES_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=lib/backup.sh
@@ -106,7 +127,8 @@ echo "    (server-side hardening is separate and NOT run automatically --"
 echo "    see ssh/harden-server.sh)"
 
 echo "==> SDKMAN"
-if command -v zip >/dev/null 2>&1 && command -v unzip >/dev/null 2>&1; then
+if ! full_only; then :
+elif command -v zip >/dev/null 2>&1 && command -v unzip >/dev/null 2>&1; then
   "$DOTFILES_DIR/sdkman/setup.sh"
 else
   echo "    zip/unzip not installed ($NOT_AUTO):"
@@ -114,10 +136,11 @@ else
 fi
 
 echo "==> nvm"
-"$DOTFILES_DIR/nvm/setup.sh"
+full_only && "$DOTFILES_DIR/nvm/setup.sh"
 
 echo "==> bun"
-if command -v unzip >/dev/null 2>&1; then
+if ! full_only; then :
+elif command -v unzip >/dev/null 2>&1; then
   "$DOTFILES_DIR/bun/setup.sh"
 else
   echo "    unzip not installed ($NOT_AUTO):"
@@ -125,7 +148,7 @@ else
 fi
 
 echo "==> pnpm"
-"$DOTFILES_DIR/pnpm/setup.sh"
+full_only && "$DOTFILES_DIR/pnpm/setup.sh"
 
 echo "==> Docker"
 if command -v docker >/dev/null 2>&1; then
@@ -171,13 +194,14 @@ else
 fi
 
 echo "==> uv"
-"$DOTFILES_DIR/uv/setup.sh"
+full_only && "$DOTFILES_DIR/uv/setup.sh"
 
 echo "==> Claude Code"
-"$DOTFILES_DIR/claude/setup.sh"
+full_only && "$DOTFILES_DIR/claude/setup.sh"
 
 echo "==> WakaTime"
-if command -v unzip >/dev/null 2>&1; then
+if ! full_only; then :
+elif command -v unzip >/dev/null 2>&1; then
   "$DOTFILES_DIR/wakatime/setup.sh"
 else
   echo "    unzip not installed ($NOT_AUTO):"

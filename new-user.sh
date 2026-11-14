@@ -22,6 +22,9 @@
 #   --sudo                add the user to the sudo group, so they can use
 #                         sudo instead of needing root. NOT the default --
 #                         same root-equivalent reasoning as --docker.
+#   --profile server      install only the shell basics for this user: no dev
+#                         runtimes, Claude Code, WakaTime or commit signing
+#                         (DOTFILES_PROFILE=server, see install.sh).
 #   --groups G1,G2        also add the user to these existing groups, e.g.
 #                         ssh-users on a server with AllowGroups ssh-users.
 #                         A group that doesn't exist is reported, not created.
@@ -36,7 +39,7 @@ if [ "$(id -u)" -ne 0 ]; then
   exit 1
 fi
 
-USERNAME="${1:?Usage: sudo $0 <username> [--no-password] [--git-name NAME] [--git-email EMAIL] [--docker] [--sudo] [--groups G1,G2]}"
+USERNAME="${1:?Usage: sudo $0 <username> [--no-password] [--git-name NAME] [--git-email EMAIL] [--docker] [--sudo] [--groups G1,G2] [--profile full|server]}"
 shift
 
 SET_PASSWORD=1
@@ -45,6 +48,7 @@ NEW_GIT_EMAIL=""
 ADD_DOCKER=0
 ADD_SUDO=0
 EXTRA_GROUPS=""
+PROFILE="full"
 while [ $# -gt 0 ]; do
   case "$1" in
     --no-password) SET_PASSWORD=0; shift ;;
@@ -52,6 +56,7 @@ while [ $# -gt 0 ]; do
     --git-email) NEW_GIT_EMAIL="${2:?--git-email needs a value}"; shift 2 ;;
     --docker) ADD_DOCKER=1; shift ;;
     --sudo) ADD_SUDO=1; shift ;;
+    --profile) PROFILE="${2:?--profile needs full or server}"; shift 2 ;;
     --groups) EXTRA_GROUPS="${2:?--groups needs a comma-separated list}"; shift 2 ;;
     *) echo "Unknown option: $1" >&2; exit 1 ;;
   esac
@@ -97,7 +102,7 @@ else
 fi
 
 echo "==> Running install.sh as $USERNAME"
-runuser -l "$USERNAME" -c "GIT_NAME=$(printf '%q' "$NEW_GIT_NAME") GIT_EMAIL=$(printf '%q' "$NEW_GIT_EMAIL") $(printf '%q' "$USER_HOME/dotfiles/install.sh")"
+runuser -l "$USERNAME" -c "DOTFILES_PROFILE=$(printf '%q' "$PROFILE") GIT_NAME=$(printf '%q' "$NEW_GIT_NAME") GIT_EMAIL=$(printf '%q' "$NEW_GIT_EMAIL") $(printf '%q' "$USER_HOME/dotfiles/install.sh")"
 
 if [ "$ADD_SUDO" -eq 1 ]; then
   echo "==> sudo group"

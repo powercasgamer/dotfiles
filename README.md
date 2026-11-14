@@ -115,6 +115,14 @@ exec zsh
 (`gh` doesn't need an apt install — `git/setup.sh` fetches its binary
 directly, same as git-lfs.)
 
+**Servers: `DOTFILES_PROFILE=server ~/dotfiles/install.sh`** installs only the
+shell basics (zsh, Oh My Zsh, git config, tmux, nano, SSH client config) and
+skips SDKMAN, nvm, bun, pnpm, uv, Claude Code, WakaTime and git commit signing.
+Use it where nothing gets developed, or where root is shared with someone
+else: fewer runtimes to keep patched, no signing key on the box, and no
+WakaTime sending file and host names to wakatime.com. `new-user.sh --profile
+server` does the same for a new account.
+
 `install.sh` is idempotent — re-run it any time (e.g. after pulling updates)
 and it will skip anything already installed. `dotfiles-update` does both in
 one go: `git pull --ff-only` in `~/dotfiles`, then `install.sh`.
@@ -320,6 +328,7 @@ sudo ~/dotfiles/new-user.sh <username> \
 sudo ~/dotfiles/new-user.sh <username> --docker  # also add them to the docker group
 sudo ~/dotfiles/new-user.sh <username> --sudo    # also add them to the sudo group
 sudo ~/dotfiles/new-user.sh <username> --groups ssh-users  # and any other existing groups
+sudo ~/dotfiles/new-user.sh <username> --profile server   # shell basics only, see above
 ```
 
 Must be run as root (it calls `useradd`/`apt-get`/`passwd`), so it needs a
